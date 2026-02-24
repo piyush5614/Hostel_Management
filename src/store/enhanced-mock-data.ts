@@ -6,6 +6,7 @@ import {
   DailyReport, AttendanceSheet, SystemSettings,
   DashboardStats, Activity, AutoAssignCriteria
 } from '../types';
+import { eventBus, EVENTS } from '../utils/event-bus';
 
 // Enhanced comprehensive demo data with 50+ students
 export const enhancedMockStudents: Student[] = [
@@ -286,8 +287,8 @@ const generateAdditionalStudents = (): Student[] => {
       guardianContact: `98765432${(50 + i).toString().slice(-2)}`,
       emergencyContact: `98765432${(100 + i).toString().slice(-2)}`,
       medicalNotes: Math.random() > 0.7 ? 'No known medical issues' : '',
-      roomId: Math.random() > 0.1 ? Math.floor(Math.random() * 50 + 1).toString() : undefined,
-      bedId: Math.random() > 0.1 ? `${Math.floor(Math.random() * 50 + 1)}-bed-${Math.floor(Math.random() * 3) + 1}` : undefined,
+      roomId: i <= 25 ? Math.floor(Math.random() * 50 + 1).toString() : undefined,
+      bedId: i <= 25 ? `${Math.floor(Math.random() * 50 + 1)}-bed-${Math.floor(Math.random() * 3) + 1}` : undefined,
       profileImage: `https://images.pexels.com/photos/${1000000 + Math.floor(Math.random() * 500000)}/pexels-photo-${1000000 + Math.floor(Math.random() * 500000)}.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1`,
       joiningDate: `${2021 + (4 - year)}-01-15`,
       isActive: true,
@@ -744,7 +745,7 @@ export const approvePhotoSubmission = (submissionId: string, approverId: string)
   submission.approvedBy = approverId;
   submission.approvedAt = new Date().toISOString();
 
-  // Update related task
+  // Update related task in enhanced data
   const task = enhancedMockStaffTasks.find(t => t.id === submission.taskId);
   if (task) {
     task.status = 'completed';
@@ -753,6 +754,20 @@ export const approvePhotoSubmission = (submissionId: string, approverId: string)
     task.photoApprovedBy = approverId;
     task.photoApprovedAt = new Date().toISOString();
   }
+
+  // Also update runtime mockStaffTasks (from mock-data.ts) via dynamic import
+  import('./mock-data').then(mockData => {
+    if (mockData.updateStaffTask) {
+      mockData.updateStaffTask(submission.taskId, {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        photoSubmissionStatus: 'approved',
+        photoApprovedBy: approverId,
+        photoApprovedAt: new Date().toISOString(),
+      });
+    }
+  }).catch(() => {});
+  eventBus.emit(EVENTS.TASK_UPDATED);
 
   return true;
 };
@@ -766,12 +781,22 @@ export const rejectPhotoSubmission = (submissionId: string, reason: string, appr
   submission.approvedBy = approverId;
   submission.approvedAt = new Date().toISOString();
 
-  // Update related task
+  // Update related task in enhanced data
   const task = enhancedMockStaffTasks.find(t => t.id === submission.taskId);
   if (task) {
     task.photoSubmissionStatus = 'rejected';
     task.notes = `${task.notes || ''}\n\nPhoto submission rejected: ${reason}`;
   }
+
+  // Also update runtime mockStaffTasks (from mock-data.ts) via dynamic import
+  import('./mock-data').then(mockData => {
+    if (mockData.updateStaffTask) {
+      mockData.updateStaffTask(submission.taskId, {
+        photoSubmissionStatus: 'rejected',
+      });
+    }
+  }).catch(() => {});
+  eventBus.emit(EVENTS.TASK_UPDATED);
 
   return true;
 };

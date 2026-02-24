@@ -15,6 +15,7 @@ import {
   mockStaffTasks, mockStaff, updateStaffTask, deleteStaffTask,
   addTaskComment, reassignTask, getStaffWorkload, getLinkedStaffId,
 } from '../../store/mock-data';
+import { mockPhotoSubmissions, PhotoSubmission } from '../../store/enhanced-mock-data';
 import { StaffTask } from '../../types';
 import { cn, formatDate, formatDateTime } from '../../lib/utils';
 import { toast } from 'sonner';
@@ -535,10 +536,25 @@ function TaskDetailPanel({
         processed++;
         if (processed === files.length) {
           const existing = task.workInProgressPhotos || [];
+          const allPhotos = [...existing, ...newPhotos];
           updateStaffTask(task.id, {
-            workInProgressPhotos: [...existing, ...newPhotos],
+            workInProgressPhotos: allPhotos,
             photoSubmissionStatus: 'pending',
           });
+
+          // Also create a PhotoSubmission record so warden/admin dashboard can see it
+          const staffMember = mockStaff.find(s => s.id === task.assignedTo);
+          mockPhotoSubmissions.push({
+            id: `photo-${Date.now()}`,
+            taskId: task.id,
+            staffId: task.assignedTo,
+            photos: allPhotos,
+            submittedAt: new Date().toISOString(),
+            status: 'pending',
+            taskTitle: task.title,
+            staffName: staffMember?.name || 'Unknown Staff',
+          });
+
           toast.success(`${newPhotos.length} proof file(s) uploaded — awaiting approval`);
           onTaskRefresh(task.id);
         }
