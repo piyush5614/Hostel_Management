@@ -1,7 +1,0 @@
-ext {
-    // Define any custom variables for the project here
-    compileSdkVersion = 31
-    minSdkVersion = 21
-    targetSdkVersion = 31
-    kotlinVersion = '1.5.31'
-}

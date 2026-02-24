@@ -28,9 +28,5 @@ yarn-debug.log*
 *.sln
 *.sw?
 
-# Android
-*.apk
-*.aab
-local.properties
-.gradle/
-build/
+# Bolt
+.bolt/
