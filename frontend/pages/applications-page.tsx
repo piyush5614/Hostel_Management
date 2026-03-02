@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
 import { mockApplications } from '../store/mock-data';
 import { Application } from '../types';
-import { FileText, Plus, Eye, Clock } from 'lucide-react';
+import { FileText, Plus, Eye, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
@@ -21,7 +21,21 @@ export function ApplicationsPage() {
     description: '',
   });
 
-  const userApplications = mockApplications.filter(app => app.studentId === user?.id);
+  const isAdminOrWarden = user?.role === 'admin' || user?.role === 'warden';
+  const canCreateApplication = user?.role === 'student' || user?.role === 'staff';
+
+  // Admin/Warden see all applications; students/staff see only their own
+  const visibleApplications = isAdminOrWarden
+    ? mockApplications
+    : mockApplications.filter(app => app.studentId === user?.id);
+
+  const getApplicationStats = () => {
+    const total = mockApplications.length;
+    const pending = mockApplications.filter(a => a.status === 'pending').length;
+    const approved = mockApplications.filter(a => a.status === 'approved').length;
+    const rejected = mockApplications.filter(a => a.status === 'rejected').length;
+    return { total, pending, approved, rejected };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +58,22 @@ export function ApplicationsPage() {
     });
   };
 
+  const handleStatusUpdate = (applicationId: string, newStatus: Application['status']) => {
+    const appIndex = mockApplications.findIndex(app => app.id === applicationId);
+    if (appIndex !== -1) {
+      mockApplications[appIndex] = {
+        ...mockApplications[appIndex],
+        status: newStatus,
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: user?.id,
+      };
+      if (selectedApplication?.id === applicationId) {
+        setSelectedApplication({ ...mockApplications[appIndex] });
+      }
+      toast.success(`Application ${newStatus}!`);
+    }
+  };
+
   const getStatusColor = (status: Application['status']) => {
     switch (status) {
       case 'pending': return 'text-warning-600 bg-warning-50';
@@ -53,26 +83,80 @@ export function ApplicationsPage() {
     }
   };
 
+  const stats = getApplicationStats();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Applications</h1>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Application
-        </Button>
+        {canCreateApplication && (
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Application
+          </Button>
+        )}
       </div>
+
+      {/* Statistics Cards for Admin/Warden */}
+      {isAdminOrWarden && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-primary-500" />
+                <div>
+                  <p className="text-sm font-medium">Total</p>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-warning-500" />
+                <div>
+                  <p className="text-sm font-medium">Pending</p>
+                  <p className="text-2xl font-bold">{stats.pending}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-5 w-5 text-success-500" />
+                <div>
+                  <p className="text-sm font-medium">Approved</p>
+                  <p className="text-2xl font-bold">{stats.approved}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <XCircle className="h-5 w-5 text-error-500" />
+                <div>
+                  <p className="text-sm font-medium">Rejected</p>
+                  <p className="text-2xl font-bold">{stats.rejected}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Applications List */}
         <div className="md:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>My Applications</CardTitle>
+              <CardTitle>{isAdminOrWarden ? 'All Applications' : 'My Applications'}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {userApplications.map((application) => (
+                {visibleApplications.map((application) => (
                   <div
                     key={application.id}
                     className={cn(
@@ -89,12 +173,42 @@ export function ApplicationsPage() {
                         </p>
                         <p className="mt-1 text-sm">{application.description.substring(0, 100)}...</p>
                       </div>
-                      <span className={cn(
-                        'rounded-full px-2 py-1 text-xs font-medium',
-                        getStatusColor(application.status)
-                      )}>
-                        {application.status.replace('-', ' ')}
-                      </span>
+                      <div className="flex flex-col items-end space-y-2">
+                        <span className={cn(
+                          'rounded-full px-2 py-1 text-xs font-medium',
+                          getStatusColor(application.status)
+                        )}>
+                          {application.status.replace('-', ' ')}
+                        </span>
+
+                        {isAdminOrWarden && application.status === 'pending' && (
+                          <div className="flex space-x-1">
+                            <Button
+                              size="sm"
+                              className="bg-success-600 hover:bg-success-700 text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStatusUpdate(application.id, 'approved');
+                              }}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-error-600 border-error-300 hover:bg-error-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStatusUpdate(application.id, 'rejected');
+                              }}
+                            >
+                              <XCircle className="mr-1 h-3 w-3" />
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground">
                       Submitted: {new Date(application.submittedAt).toLocaleDateString()}
@@ -102,11 +216,17 @@ export function ApplicationsPage() {
                   </div>
                 ))}
                 
-                {userApplications.length === 0 && (
+                {visibleApplications.length === 0 && (
                   <div className="py-12 text-center text-muted-foreground">
                     <FileText className="mx-auto mb-4 h-12 w-12 opacity-30" />
-                    <p>No applications submitted yet.</p>
-                    <p className="text-sm">Click "New Application" to submit your first application.</p>
+                    {isAdminOrWarden ? (
+                      <p>No applications received yet.</p>
+                    ) : (
+                      <>
+                        <p>No applications submitted yet.</p>
+                        <p className="text-sm">Click "New Application" to submit your first application.</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -155,6 +275,27 @@ export function ApplicationsPage() {
                   <div>
                     <p className="text-sm font-medium mb-1">Comments:</p>
                     <p className="text-sm">{selectedApplication.comments}</p>
+                  </div>
+                )}
+
+                {/* Approve/Reject actions for Admin/Warden */}
+                {isAdminOrWarden && selectedApplication.status === 'pending' && (
+                  <div className="flex space-x-2 pt-2 border-t">
+                    <Button
+                      className="flex-1 bg-success-600 hover:bg-success-700 text-white"
+                      onClick={() => handleStatusUpdate(selectedApplication.id, 'approved')}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Approve
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-error-600 border-error-300 hover:bg-error-50"
+                      onClick={() => handleStatusUpdate(selectedApplication.id, 'rejected')}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
                   </div>
                 )}
               </CardContent>

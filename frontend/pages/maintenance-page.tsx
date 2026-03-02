@@ -24,10 +24,11 @@ export function MaintenancePage() {
     roomId: '',
   });
 
-  const canManageMaintenance = user?.role === 'admin' || user?.role === 'warden' || user?.role === 'staff';
+  const isAdminOrWarden = user?.role === 'admin' || user?.role === 'warden';
+  const canCreateRequest = user?.role === 'student' || user?.role === 'staff';
   
-  // Filter requests based on user role
-  const visibleRequests = canManageMaintenance 
+  // Admin/Warden see all requests; students/staff see only their own
+  const visibleRequests = isAdminOrWarden 
     ? mockMaintenanceRequests 
     : mockMaintenanceRequests.filter(req => req.requesterId === user?.id);
 
@@ -124,10 +125,12 @@ export function MaintenancePage() {
             <Download className="mr-2 h-4 w-4" />
             {isExporting ? 'Exporting...' : 'Export Report'}
           </Button>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Request
-          </Button>
+          {canCreateRequest && (
+            <Button onClick={() => setIsCreateModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Request
+            </Button>
+          )}
         </div>
       </div>
 
@@ -196,7 +199,7 @@ export function MaintenancePage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                {canManageMaintenance ? 'All Maintenance Requests' : 'My Requests'}
+                {isAdminOrWarden ? 'All Maintenance Requests' : 'My Requests'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -245,39 +248,45 @@ export function MaintenancePage() {
                           {request.status.replace('-', ' ')}
                         </span>
                         
-                        {canManageMaintenance && request.status === 'pending' && (
+                        {isAdminOrWarden && request.status === 'pending' && (
                           <div className="flex space-x-1">
                             <Button
                               size="sm"
+                              className="bg-success-600 hover:bg-success-700 text-white"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleStatusUpdate(request.id, 'in-progress');
                               }}
                             >
-                              Start
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Approve
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
+                              className="text-error-600 border-error-300 hover:bg-error-50"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleStatusUpdate(request.id, 'rejected');
                               }}
                             >
+                              <XCircle className="mr-1 h-3 w-3" />
                               Reject
                             </Button>
                           </div>
                         )}
                         
-                        {canManageMaintenance && request.status === 'in-progress' && (
+                        {isAdminOrWarden && request.status === 'in-progress' && (
                           <Button
                             size="sm"
+                            className="bg-success-600 hover:bg-success-700 text-white"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleStatusUpdate(request.id, 'completed');
                             }}
                           >
-                            Complete
+                            <CheckCircle className="mr-1 h-3 w-3" />
+                            Mark Complete
                           </Button>
                         )}
                       </div>
