@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { useAuthStore } from '../../store/auth-store';
-import { mockUserSettings } from '../../store/mock-data';
-import { UserSettings } from '../../types';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { useAuthStore } from '../store/auth-store';
+import { mockUserSettings } from '../store/mock-data';
+import { UserSettings } from '../types';
 import { Settings, Bell, Shield, Globe, Palette, MessageSquare, Save } from 'lucide-react';
 import { toast } from 'sonner';
 

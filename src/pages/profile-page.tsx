@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Modal } from '../../components/ui/modal';
-import { useAuthStore } from '../../store/auth-store';
-import { mockStudents, mockStaff, updateStudent, updateStaffMember, updateUser } from '../../store/mock-data';
-import { Student, Staff } from '../../types';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Modal } from '../components/ui/modal';
+import { useAuthStore } from '../store/auth-store';
+import { mockStudents, mockStaff, updateStudent, updateStaffMember, updateUser } from '../store/mock-data';
+import { Student, Staff } from '../types';
 import { Edit, Camera, Save, X, Upload, Image, Star, Sparkles, User, AlertTriangle, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 

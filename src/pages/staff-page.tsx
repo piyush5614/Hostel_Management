@@ -1,21 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Button } from '../../components/ui/button';
-import { Modal } from '../../components/ui/modal';
-import { StaffForm } from '../../components/forms/staff-form';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Button } from '../components/ui/button';
+import { Modal } from '../components/ui/modal';
+import { StaffForm } from '../components/forms/staff-form';
 import {
   Users, Search, Plus, Edit, Trash2, UserCircle,
   Phone, Mail, MapPin, Calendar, Clock, Shield,
   Briefcase, Building2, AlertCircle,
   Activity, BadgeCheck,
 } from 'lucide-react';
-import { mockStaff, deleteStaffMember, getTasksByStaff } from '../../store/mock-data';
-import { Staff } from '../../types';
-import { cn, formatDate } from '../../lib/utils';
+import { mockStaff, deleteStaffMember, getTasksByStaff } from '../store/mock-data';
+import { Staff } from '../types';
+import { cn, formatDate } from '../lib/utils';
 import { toast } from 'sonner';
-import { useAuthStore } from '../../store/auth-store';
+import { useAuthStore } from '../store/auth-store';
 
 export function StaffPage() {
   const user = useAuthStore(s => s.user);

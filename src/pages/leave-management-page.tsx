@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Modal } from '../../components/ui/modal';
-import { EnhancedLeaveForm } from '../../components/leave/enhanced-leave-form';
-import { ErrorBoundary } from '../../components/error-boundary/error-boundary';
-import { useAuthStore } from '../../store/auth-store';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Modal } from '../components/ui/modal';
+import { EnhancedLeaveForm } from '../components/leave/enhanced-leave-form';
+import { ErrorBoundary } from '../components/error-boundary/error-boundary';
+import { useAuthStore } from '../store/auth-store';
 import { 
   mockLeaveRequests, 
   mockStudents, 
@@ -16,11 +16,11 @@ import {
   updateStudent,
   getLinkedStudent,
   getLinkedStudentId
-} from '../../store/mock-data';
-import { LeaveRequest } from '../../types';
+} from '../store/mock-data';
+import { LeaveRequest } from '../types';
 import { Calendar, Clock, CheckCircle, XCircle, Plus, LogOut, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
+import { cn } from '../lib/utils';
 
 export function LeaveManagementPage() {
   const user = useAuthStore((state) => state.user);

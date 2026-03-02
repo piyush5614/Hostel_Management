@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Modal } from '../../components/ui/modal';
-import { useAuthStore } from '../../store/auth-store';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Modal } from '../components/ui/modal';
+import { useAuthStore } from '../store/auth-store';
 import { 
   mockAttendance, 
   mockStudents, 
@@ -13,13 +13,13 @@ import {
   submitAttendanceToAdmin,
   exportData,
   getLinkedStudentId
-} from '../../store/mock-data';
-import { AttendanceSheet, Attendance } from '../../types';
+} from '../store/mock-data';
+import { AttendanceSheet, Attendance } from '../types';
 import { Calendar, Download, Send, Users, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
-import { useDataRefresh } from '../../utils/use-data-refresh';
-import { EVENTS } from '../../utils/event-bus';
+import { cn } from '../lib/utils';
+import { useDataRefresh } from '../utils/use-data-refresh';
+import { EVENTS } from '../utils/event-bus';
 
 export function AttendancePage() {
   const user = useAuthStore((state) => state.user);

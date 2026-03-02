@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Modal } from '../../components/ui/modal';
-import { useAuthStore } from '../../store/auth-store';
-import { mockReports } from '../../store/mock-data';
-import { Report } from '../../types';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Modal } from '../components/ui/modal';
+import { useAuthStore } from '../store/auth-store';
+import { mockReports } from '../store/mock-data';
+import { Report } from '../types';
 import { AlertTriangle, Plus, Eye, MessageSquare, Camera, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
+import { cn } from '../lib/utils';
 
 export function ReportsPage() {
   const user = useAuthStore((state) => state.user);

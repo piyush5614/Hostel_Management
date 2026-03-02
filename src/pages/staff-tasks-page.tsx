@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Button } from '../../components/ui/button';
-import { Modal } from '../../components/ui/modal';
-import { TaskForm } from '../../components/forms/task-form';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Button } from '../components/ui/button';
+import { Modal } from '../components/ui/modal';
+import { TaskForm } from '../components/forms/task-form';
 import {
   ListChecks, Search, Plus, Clock, CheckCircle2, XCircle,
   AlertTriangle, ArrowRight, UserCircle,
@@ -14,14 +14,14 @@ import {
 import {
   mockStaffTasks, mockStaff, updateStaffTask, deleteStaffTask,
   addTaskComment, reassignTask, getStaffWorkload, getLinkedStaffId,
-} from '../../store/mock-data';
-import { mockPhotoSubmissions, PhotoSubmission } from '../../store/enhanced-mock-data';
-import { StaffTask } from '../../types';
-import { cn, formatDate, formatDateTime } from '../../lib/utils';
+} from '../store/mock-data';
+import { mockPhotoSubmissions, PhotoSubmission } from '../store/enhanced-mock-data';
+import { StaffTask } from '../types';
+import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { toast } from 'sonner';
-import { useAuthStore } from '../../store/auth-store';
-import { useDataRefresh } from '../../utils/use-data-refresh';
-import { EVENTS } from '../../utils/event-bus';
+import { useAuthStore } from '../store/auth-store';
+import { useDataRefresh } from '../utils/use-data-refresh';
+import { EVENTS } from '../utils/event-bus';
 
 const priorityConfig = {
   low: { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: null },

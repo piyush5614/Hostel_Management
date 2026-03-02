@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Button } from '../../components/ui/button';
-import { Modal } from '../../components/ui/modal';
-import { RoomForm } from '../../components/forms/room-form';
-import { RoomAllocationForm } from '../../components/forms/room-allocation-form';
-import { AutoAssignModal } from '../../components/forms/auto-assign-modal';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Button } from '../components/ui/button';
+import { Modal } from '../components/ui/modal';
+import { RoomForm } from '../components/forms/room-form';
+import { RoomAllocationForm } from '../components/forms/room-allocation-form';
+import { AutoAssignModal } from '../components/forms/auto-assign-modal';
 import { Building2, CheckCircle2, Circle, Search, SquareAsterisk, Plus, Edit, Trash2, Users, Zap } from 'lucide-react';
-import { mockRooms, mockBeds, mockStudents, deleteRoom, autoAssignStudents } from '../../store/mock-data';
-import { Room, Bed, Student, AutoAssignCriteria } from '../../types';
-import { cn } from '../../lib/utils';
+import { mockRooms, mockBeds, mockStudents, deleteRoom, autoAssignStudents } from '../store/mock-data';
+import { Room, Bed, Student, AutoAssignCriteria } from '../types';
+import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 
 export function RoomsPage() {

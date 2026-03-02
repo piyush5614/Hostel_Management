@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Modal } from '../../components/ui/modal';
-import { useAuthStore } from '../../store/auth-store';
-import { mockMessages, mockStudents, mockStaff } from '../../store/mock-data';
-import { Message } from '../../types';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Modal } from '../components/ui/modal';
+import { useAuthStore } from '../store/auth-store';
+import { mockMessages, mockStudents, mockStaff } from '../store/mock-data';
+import { Message } from '../types';
 import { 
   MessageCircle, Plus, Send, Search, Paperclip, Smile, MoreVertical, 
   Phone, Video, Star, Sparkles, Heart, ThumbsUp, Image as ImageIcon,
   Mic, Camera, Gift, MapPin, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
+import { cn } from '../lib/utils';
 
 export function MessagesPage() {
   const user = useAuthStore((state) => state.user);

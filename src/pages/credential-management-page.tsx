@@ -1,17 +1,17 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Button } from '../components/ui/button';
 import {
   Key, Search, Copy, Check, RefreshCw, Shield,
   UserCircle, Download, Clock, AlertCircle,
 } from 'lucide-react';
-import { mockCredentials, mockStaff, resetCredentialPassword, mockActivityLogs } from '../../store/mock-data';
-import { GeneratedCredential } from '../../types';
-import { cn, formatDate, formatDateTime } from '../../lib/utils';
+import { mockCredentials, mockStaff, resetCredentialPassword, mockActivityLogs } from '../store/mock-data';
+import { GeneratedCredential } from '../types';
+import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { toast } from 'sonner';
-import { useAuthStore } from '../../store/auth-store';
+import { useAuthStore } from '../store/auth-store';
 
 export function CredentialManagementPage() {
   const user = useAuthStore(s => s.user);
