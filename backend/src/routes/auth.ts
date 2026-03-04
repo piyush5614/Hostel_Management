@@ -6,9 +6,11 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
+// Signup – also accepts an optional `generatedId` (e.g. STAFF-0001, STU-0001)
+// If a user with the same email OR generatedId already exists, update their password instead.
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name, role = 'student' } = req.body;
+    const { email, password, name, role = 'student', generatedId } = req.body;
 
     if (!email || !password || !name) {
       res.status(400).json({ error: 'Email, password, and name are required' });
@@ -16,20 +18,63 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     }
 
     const db = await getDb();
-    const existing = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+
+    // Check if the user already exists (by email or by generated_id)
+    let existing = await db.get(
+      'SELECT id, email FROM users WHERE email = ?',
+      [email]
+    );
+    if (!existing && generatedId) {
+      existing = await db.get(
+        'SELECT id, email FROM users WHERE generated_id = ?',
+        [generatedId]
+      );
+    }
 
     if (existing) {
-      res.status(409).json({ error: 'User already exists' });
+      // Update the existing user's password (and generated_id / name if provided)
+      const hashedPassword = await hashPassword(password);
+      try {
+        await db.run(
+          `UPDATE users SET password = ?, name = ?, role = ?, generated_id = COALESCE(?, generated_id) WHERE id = ?`,
+          [hashedPassword, name, role, generatedId || null, existing.id]
+        );
+      } catch (updateErr: any) {
+        // If generated_id conflicts with another user, skip the generated_id update
+        if (updateErr.code === 'SQLITE_CONSTRAINT') {
+          await db.run(
+            `UPDATE users SET password = ?, name = ?, role = ? WHERE id = ?`,
+            [hashedPassword, name, role, existing.id]
+          );
+        } else {
+          throw updateErr;
+        }
+      }
+      const token = generateToken({ userId: existing.id, email: existing.email, role });
+      res.status(200).json({ user: { id: existing.id, email: existing.email, name, role }, token });
       return;
     }
 
     const userId = uuidv4();
     const hashedPassword = await hashPassword(password);
 
-    await db.run(
-      'INSERT INTO users (id, email, password, name, role, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-      [userId, email, hashedPassword, name, role]
-    );
+    try {
+      await db.run(
+        'INSERT INTO users (id, email, password, name, role, generated_id, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)',
+        [userId, email, hashedPassword, name, role, generatedId || null]
+      );
+    } catch (insertErr: any) {
+      if (insertErr.code === 'SQLITE_CONSTRAINT') {
+        // Race condition – user was inserted between our SELECT and INSERT
+        const found = await db.get('SELECT id, email FROM users WHERE email = ?', [email]);
+        if (found) {
+          const token = generateToken({ userId: found.id, email: found.email, role });
+          res.status(200).json({ user: { id: found.id, email: found.email, name, role }, token });
+          return;
+        }
+      }
+      throw insertErr;
+    }
 
     const token = generateToken({ userId, email, role });
     res.status(201).json({ user: { id: userId, email, name, role }, token });
@@ -39,17 +84,23 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// Login – accepts email OR generated_id (e.g. STAFF-0001, STU-0001)
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required' });
+      res.status(400).json({ error: 'Email/ID and password are required' });
       return;
     }
 
     const db = await getDb();
-    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+
+    // Try matching by email first, then by generated_id
+    let user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+    if (!user) {
+      user = await db.get('SELECT * FROM users WHERE generated_id = ?', [email]);
+    }
 
     if (!user || !(await comparePassword(password, user.password))) {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -63,7 +114,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     const token = generateToken({ userId: user.id, email: user.email, role: user.role });
     res.json({
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        generated_id: user.generated_id,
+        profile_image: user.profile_image,
+      },
       token,
     });
   } catch (error) {
@@ -75,9 +133,10 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 router.get('/me', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
-    const user = await db.get('SELECT id, email, name, role, profile_image, is_active FROM users WHERE id = ?', [
-      req.user?.userId,
-    ]);
+    const user = await db.get(
+      'SELECT id, email, name, role, profile_image, generated_id, is_active FROM users WHERE id = ?',
+      [req.user?.userId]
+    );
 
     if (!user) {
       res.status(404).json({ error: 'User not found' });

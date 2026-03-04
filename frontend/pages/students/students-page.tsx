@@ -10,8 +10,11 @@ import { mockStudents, deleteStudent } from '../../store/mock-data';
 import { Student } from '../../types';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
+import { useAuthStore } from '../../store/auth-store';
 
 export function StudentsPage() {
+  const user = useAuthStore((state) => state.user);
+  const canEdit = user?.role === 'admin' || user?.role === 'warden';
   const [filteredStudents, setFilteredStudents] = useState<Student[]>(mockStudents);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,10 +143,12 @@ export function StudentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Student Management</h1>
-        <Button onClick={handleAddStudent}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add New Student
-        </Button>
+        {canEdit && (
+          <Button onClick={handleAddStudent}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add New Student
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-5">
@@ -202,7 +207,7 @@ export function StudentsPage() {
         </Card>
 
         {/* Students List */}
-        <div className="md:col-span-2">
+        <div className={selectedStudent ? 'md:col-span-2' : 'md:col-span-4'}>
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Students ({filteredStudents.length})</CardTitle>
@@ -241,26 +246,30 @@ export function StudentsPage() {
                     </div>
 
                     <div className="flex space-x-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditStudent(student);
-                        }}
-                        className="rounded bg-primary-600 p-1 text-white hover:bg-primary-700"
-                        title="Edit student"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteStudent(student);
-                        }}
-                        className="rounded bg-error-600 p-1 text-white hover:bg-error-700"
-                        title="Delete student"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {canEdit && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditStudent(student);
+                            }}
+                            className="rounded bg-primary-600 p-1 text-white hover:bg-primary-700"
+                            title="Edit student"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteStudent(student);
+                            }}
+                            className="rounded bg-error-600 p-1 text-white hover:bg-error-700"
+                            title="Delete student"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -279,8 +288,8 @@ export function StudentsPage() {
         </div>
 
         {/* Student Details */}
+        {selectedStudent && (
         <div className="md:col-span-2">
-          {selectedStudent ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">{selectedStudent.name}</CardTitle>
@@ -355,32 +364,48 @@ export function StudentsPage() {
                   </div>
                 )}
 
-                <div className="flex space-x-2 pt-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => handleEditStudent(selectedStudent)}
-                  >
-                    Edit Student
-                  </Button>
-                  <Button 
-                    className="flex-1"
-                    disabled={selectedStudent.roomId ? true : false}
-                  >
-                    {selectedStudent.roomId ? 'Room Allocated' : 'Allocate Room'}
-                  </Button>
-                </div>
+                {/* Parent Images */}
+                {(selectedStudent.parentImage1 || selectedStudent.parentImage2) && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Parent Photos</p>
+                    <div className="flex space-x-3">
+                      {selectedStudent.parentImage1 && (
+                        <div className="text-center">
+                          <img src={selectedStudent.parentImage1} alt="Parent 1" className="w-16 h-16 rounded-lg object-cover border" />
+                          <p className="text-xs text-muted-foreground mt-1">Parent 1</p>
+                        </div>
+                      )}
+                      {selectedStudent.parentImage2 && (
+                        <div className="text-center">
+                          <img src={selectedStudent.parentImage2} alt="Parent 2" className="w-16 h-16 rounded-lg object-cover border" />
+                          <p className="text-xs text-muted-foreground mt-1">Parent 2</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {canEdit && (
+                  <div className="flex space-x-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleEditStudent(selectedStudent)}
+                    >
+                      Edit Student
+                    </Button>
+                    <Button 
+                      className="flex-1"
+                      disabled={selectedStudent.roomId ? true : false}
+                    >
+                      {selectedStudent.roomId ? 'Room Allocated' : 'Allocate Room'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ) : (
-            <Card className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-              <div>
-                <Users className="mx-auto mb-2 h-12 w-12 opacity-30" />
-                <p>Select a student to view details</p>
-              </div>
-            </Card>
-          )}
         </div>
+        )}
       </div>
 
       {/* Add Student Modal */}

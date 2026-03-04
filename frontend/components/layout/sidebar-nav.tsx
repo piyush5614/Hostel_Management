@@ -21,6 +21,7 @@ import {
   Clock,
   Shield,
   Key,
+  ScanLine,
 } from 'lucide-react';
 
 interface NavItem {
@@ -74,6 +75,12 @@ const getNavItemsForRole = (role: UserRole): NavItem[] => {
         title: 'Leave Management',
         href: '/leave',
         icon: <Clock className="h-5 w-5" />,
+        roles: ['admin'],
+      },
+      {
+        title: 'QR Scanner',
+        href: '/scan',
+        icon: <ScanLine className="h-5 w-5" />,
         roles: ['admin'],
       },
       {
@@ -159,6 +166,12 @@ const getNavItemsForRole = (role: UserRole): NavItem[] => {
         title: 'Leave Management',
         href: '/leave',
         icon: <Clock className="h-5 w-5" />,
+        roles: ['warden'],
+      },
+      {
+        title: 'QR Scanner',
+        href: '/scan',
+        icon: <ScanLine className="h-5 w-5" />,
         roles: ['warden'],
       },
       {

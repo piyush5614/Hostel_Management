@@ -1,11 +1,9 @@
-// SUPABASE TEMPORARILY DISABLED FOR DEVELOPMENT
-// This file contains mock implementations to replace Supabase functionality
-// To re-enable Supabase: uncomment the real implementation and update environment variables
+// HYBRID AUTH — tries the real Express backend first, falls back to mock
+// Backend runs on /api (proxied via Vite in dev)
 
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
-// Dynamic credential registry — mock-data registers credentials here so login can use them
-// This avoids circular imports (supabase.ts <-> mock-data.ts)
+/* ──────────────── Credential registry (kept for mock fallback) ──────────────── */
 interface RegisteredCredential {
   email: string;
   generatedId: string;
@@ -18,19 +16,64 @@ interface RegisteredCredential {
 
 const credentialRegistry: RegisteredCredential[] = [];
 
+/**
+ * Register a credential for login.  
+ * This ALSO fire-and-forgets a signup call to the real backend so the
+ * account is available across browsers.
+ */
 export const registerCredentialForLogin = (cred: RegisteredCredential) => {
-  // Avoid duplicates
+  // Local registry (mock fallback)
   const idx = credentialRegistry.findIndex(c => c.generatedId === cred.generatedId);
   if (idx === -1) {
     credentialRegistry.push(cred);
   } else {
     Object.assign(credentialRegistry[idx], cred);
   }
+
+  // Fire-and-forget: push to real backend
+  backendSignup(cred).catch(() => {
+    /* backend may not be running – that's fine */
+  });
 };
 
 export const getRegisteredCredentials = () => credentialRegistry;
 
-// Enhanced mock user data for authentication with default test accounts
+/* ──────────────── Backend helpers ──────────────── */
+
+async function backendSignup(cred: RegisteredCredential): Promise<void> {
+  await fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: cred.email,
+      password: cred.generatedPassword,
+      name: cred.name,
+      role: cred.role,
+      generatedId: cred.generatedId,
+    }),
+  });
+}
+
+interface BackendLoginResult {
+  user: { id: string; email: string; name: string; role: string; generated_id?: string; profile_image?: string };
+  token: string;
+}
+
+async function backendLogin(identifier: string, password: string): Promise<BackendLoginResult | null> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: identifier, password }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as BackendLoginResult;
+  } catch {
+    return null; // backend unreachable
+  }
+}
+
+/* ──────────────── Built-in demo accounts (mock fallback) ──────────────── */
 const MOCK_USERS = [
   {
     id: 'admin-auth-id',
@@ -100,24 +143,97 @@ const MOCK_USERS = [
   }
 ];
 
-// Mock session storage with enhanced persistence
+/* ──────────────── Session storage ──────────────── */
 let currentSession: any = null;
 
-// Enhanced Mock Supabase client implementation
+/* ──────────────── Mock Supabase client (hybrid) ──────────────── */
 export const supabase = {
   auth: {
-    // Enhanced mock sign in with password
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
-      const identifier = email; // Could be email OR generated ID (STAFF-XXXX / STU-XXXX)
-      console.log('🔐 Enhanced mock authentication attempt for:', identifier);
-      
-      // Simulate realistic network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // 1. Try matching against built-in demo accounts (by email)
+      const identifier = email;
+      console.log('🔐 Hybrid auth – attempting login for:', identifier);
+
+      // ───── 1.  Try the real backend first ─────
+      const backendResult = await backendLogin(identifier, password);
+      if (backendResult) {
+        console.log('✅ Backend login successful for:', backendResult.user.email);
+
+        const bu = backendResult.user;
+        const mockUser: SupabaseUser = {
+          id: bu.id,
+          email: bu.email!,
+          user_metadata: { role: bu.role },
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          email_confirmed_at: new Date().toISOString(),
+          last_sign_in_at: new Date().toISOString(),
+          role: 'authenticated',
+          confirmation_sent_at: null,
+          confirmed_at: new Date().toISOString(),
+          email_change_sent_at: null,
+          new_email: null,
+          invited_at: null,
+          action_link: null,
+          recovery_sent_at: null,
+          phone: null,
+          phone_confirmed_at: null,
+          phone_change_sent_at: null,
+          new_phone: null,
+          identities: [],
+          factors: [],
+        };
+
+        const mockSession = {
+          access_token: backendResult.token,
+          refresh_token: 'backend-refresh',
+          expires_in: 604800,
+          expires_at: Date.now() + 604800000,
+          token_type: 'bearer',
+          user: mockUser,
+        };
+
+        // Update or push into MOCK_USERS so getUserProfile works
+        const existingIdx = MOCK_USERS.findIndex(u => u.email === bu.email);
+        const backendProfile = {
+          id: bu.id,
+          auth_id: bu.id,
+          name: bu.name,
+          email: bu.email,
+          role: bu.role,
+          profile_image: bu.profile_image || '',
+          is_active: true,
+          last_login: new Date().toISOString(),
+        };
+        if (existingIdx !== -1) {
+          // Update existing entry with correct backend UUID
+          MOCK_USERS[existingIdx].id = bu.id;
+          MOCK_USERS[existingIdx].profile = { ...MOCK_USERS[existingIdx].profile, ...backendProfile };
+        } else {
+          MOCK_USERS.push({
+            id: bu.id,
+            email: bu.email,
+            password: '',
+            user_metadata: { role: bu.role },
+            profile: backendProfile,
+          });
+        }
+
+        currentSession = mockSession;
+        localStorage.setItem('tc-hostel-enhanced-session', JSON.stringify(mockSession));
+
+        return { data: { user: mockUser, session: mockSession }, error: null };
+      }
+
+      // ───── 2.  Fallback: in-memory mock ─────
+      console.log('⚠️  Backend unavailable – falling back to mock auth');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      // Try built-in demo accounts
       let user = MOCK_USERS.find(u => u.email === identifier && u.password === password);
-      
-      // 2. If no match, try matching against generated credentials (by email OR generated ID)
+
+      // Try credential registry
       if (!user) {
         const credential = credentialRegistry.find(
           (c) =>
@@ -126,20 +242,16 @@ export const supabase = {
              c.generatedId?.toLowerCase() === identifier.toLowerCase()) &&
             c.generatedPassword === password
         );
-        
+
         if (credential) {
-          // Build a user object from the credential.
-          // Use credential.userId as the auth id so that after login
-          // the user.id stored in auth-store matches the userId field
-          // on the corresponding Staff / Student record in mock-data.
-          const authId = credential.userId;   // e.g. "staff-1737373737"
+          const authId = credential.userId;
           user = {
             id: authId,
             email: credential.email,
             password: credential.generatedPassword,
             user_metadata: { role: credential.role },
             profile: {
-              id: authId,           // keeps user.id === profile.id === Staff.userId
+              id: authId,
               auth_id: authId,
               name: credential.name,
               email: credential.email,
@@ -147,20 +259,19 @@ export const supabase = {
               profile_image: '',
               is_active: true,
               last_login: new Date().toISOString(),
-            }
+            },
           };
-          // Also add to MOCK_USERS so profile lookups work for this session
           MOCK_USERS.push(user);
         }
       }
-      
+
       if (!user) {
         return {
           data: { user: null, session: null },
-          error: { message: 'Invalid login credentials. Please check your email/ID and password.' }
+          error: { message: 'Invalid login credentials. Please check your email/ID and password.' },
         };
       }
-      
+
       const mockUser: SupabaseUser = {
         id: user.id,
         email: user.email,
@@ -184,50 +295,44 @@ export const supabase = {
         phone_change_sent_at: null,
         new_phone: null,
         identities: [],
-        factors: []
+        factors: [],
       };
-      
+
       const mockSession = {
         access_token: 'mock-access-token',
         refresh_token: 'mock-refresh-token',
         expires_in: 3600,
         expires_at: Date.now() + 3600000,
         token_type: 'bearer',
-        user: mockUser
+        user: mockUser,
       };
-      
+
       currentSession = mockSession;
       localStorage.setItem('tc-hostel-enhanced-session', JSON.stringify(mockSession));
-      
-      console.log('✅ Enhanced mock authentication successful for:', user.email);
-      
-      return {
-        data: { user: mockUser, session: mockSession },
-        error: null
-      };
+
+      console.log('✅ Mock authentication successful for:', user.email);
+
+      return { data: { user: mockUser, session: mockSession }, error: null };
     },
 
-    // Enhanced mock get session
     getSession: async () => {
       const stored = localStorage.getItem('tc-hostel-enhanced-session');
       if (stored) {
         try {
           const session = JSON.parse(stored);
-          // Check if session is expired
           if (session.expires_at > Date.now()) {
             currentSession = session;
             return { data: { session }, error: null };
           } else {
             localStorage.removeItem('tc-hostel-enhanced-session');
           }
-        } catch (error) {
+        } catch {
           localStorage.removeItem('tc-hostel-enhanced-session');
         }
       }
       return { data: { session: null }, error: null };
     },
 
-    // Enhanced mock get user
     getUser: async () => {
       if (currentSession?.user) {
         return { data: { user: currentSession.user }, error: null };
@@ -235,124 +340,128 @@ export const supabase = {
       return { data: { user: null }, error: null };
     },
 
-    // Enhanced mock sign out
     signOut: async () => {
-      console.log('🚪 Enhanced mock sign out');
+      console.log('🚪 Sign out');
       currentSession = null;
       localStorage.removeItem('tc-hostel-enhanced-session');
       return { error: null };
     },
 
-    // Enhanced mock password reset
     resetPasswordForEmail: async (email: string) => {
-      console.log('📧 Enhanced mock password reset for:', email);
+      console.log('📧 Password reset for:', email);
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       const user = MOCK_USERS.find(u => u.email === email);
       if (!user) {
         return { error: { message: 'No account found with this email address' } };
       }
-      
       return { error: null };
     },
 
-    // Enhanced mock update user
     updateUser: async (updates: any) => {
-      console.log('👤 Enhanced mock user update:', updates);
+      console.log('👤 User update:', updates);
       await new Promise(resolve => setTimeout(resolve, 500));
       return { error: null };
     },
 
-    // Enhanced mock auth state change listener
     onAuthStateChange: (callback: (event: string, session: any) => void) => {
-      console.log('👂 Enhanced mock auth state change listener registered');
-      return {
-        data: { subscription: { unsubscribe: () => {} } }
-      };
-    }
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    },
   },
 
-  // Enhanced mock database operations
   from: (table: string) => ({
     select: (columns?: string) => ({
       eq: (column: string, value: any) => ({
         single: async () => {
-          console.log(`📊 Enhanced mock query: SELECT ${columns || '*'} FROM ${table} WHERE ${column} = ${value}`);
-          
           if (table === 'users') {
             const user = MOCK_USERS.find(u => u.profile.auth_id === value || u.profile.id === value);
-            if (user) {
-              return { data: user.profile, error: null };
-            }
+            if (user) return { data: user.profile, error: null };
             return { data: null, error: { message: 'User not found' } };
           }
-          
           return { data: null, error: { message: 'Mock data not implemented for this table' } };
-        }
-      })
+        },
+      }),
     }),
     insert: (data: any) => ({
       select: () => ({
-        single: async () => {
-          console.log(`📝 Enhanced mock insert into ${table}:`, data);
-          return { data: { id: 'mock-id', ...data[0] }, error: null };
-        }
-      })
+        single: async () => ({ data: { id: 'mock-id', ...data[0] }, error: null }),
+      }),
     }),
     update: (data: any) => ({
       eq: (column: string, value: any) => ({
         select: () => ({
-          single: async () => {
-            console.log(`✏️ Enhanced mock update ${table} WHERE ${column} = ${value}:`, data);
-            return { data: { id: value, ...data }, error: null };
-          }
-        })
-      })
-    })
-  })
+          single: async () => ({ data: { id: value, ...data }, error: null }),
+        }),
+      }),
+    }),
+  }),
 };
 
-// Enhanced mock helper functions
+/* ──────────────── Helper exports ──────────────── */
 export const getCurrentUser = async () => {
   const { data } = await supabase.auth.getUser();
   return data.user;
 };
 
 export const getUserProfile = async (authId: string) => {
-  console.log('👤 Enhanced mock getUserProfile for:', authId);
-  const user = MOCK_USERS.find(u => u.id === authId);
-  if (!user) {
-    throw new Error('User profile not found');
+  // 1. Try MOCK_USERS first (instant, works for mock & cached backend users)
+  const mockUser = MOCK_USERS.find(u => u.id === authId);
+  if (mockUser) return mockUser.profile;
+
+  // 2. Try the real backend using the stored JWT (handles page refresh)
+  try {
+    const stored = localStorage.getItem('tc-hostel-enhanced-session');
+    if (stored) {
+      const session = JSON.parse(stored);
+      const token = session?.access_token;
+      if (token && token !== 'mock-access-token') {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const bu = await res.json();
+          const profile = {
+            id: bu.id,
+            auth_id: bu.id,
+            name: bu.name,
+            email: bu.email,
+            role: bu.role,
+            profile_image: bu.profile_image || '',
+            is_active: bu.is_active ?? true,
+            last_login: new Date().toISOString(),
+          };
+          // Cache in MOCK_USERS for future lookups
+          MOCK_USERS.push({
+            id: bu.id,
+            email: bu.email,
+            password: '',
+            user_metadata: { role: bu.role },
+            profile,
+          });
+          return profile;
+        }
+      }
+    }
+  } catch {
+    // Backend unreachable – fall through
   }
-  return user.profile;
+
+  throw new Error('User profile not found');
 };
 
 export const createUserProfile = async (authUser: any, additionalData: any = {}) => {
-  console.log('📝 Enhanced mock createUserProfile for:', authUser.email);
   const user = MOCK_USERS.find(u => u.id === authUser.id);
-  if (user) {
-    return user.profile;
-  }
+  if (user) return user.profile;
   throw new Error('User not found in mock data');
 };
 
-export const updateLastLogin = async (userId: string) => {
-  console.log('🕒 Enhanced mock updateLastLogin for:', userId);
-  // Mock implementation - no actual update needed
-};
+export const updateLastLogin = async (_userId: string) => {};
 
-export const signOut = async () => {
-  return supabase.auth.signOut();
-};
+export const signOut = async () => supabase.auth.signOut();
 
-export const resetPassword = async (email: string) => {
-  return supabase.auth.resetPasswordForEmail(email);
-};
+export const resetPassword = async (email: string) => supabase.auth.resetPasswordForEmail(email);
 
-export const updatePassword = async (newPassword: string) => {
-  return supabase.auth.updateUser({ password: newPassword });
-};
+export const updatePassword = async (newPassword: string) => supabase.auth.updateUser({ password: newPassword });
 
 export const auth = supabase.auth;
 
-console.log('🔧 Enhanced Supabase mock implementation loaded');
+console.log('🔧 Hybrid auth (backend + mock fallback) loaded');

@@ -228,14 +228,21 @@ export const useAuthStore = create<AuthState>()(
             } catch (profileError: any) {
               console.error('❌ Failed to load user profile during initialization:', profileError);
               
-              // Sign out if profile can't be loaded
-              await supabaseSignOut();
-              set({ 
-                user: null, 
-                isAuthenticated: false, 
-                isLoading: false, 
-                error: null 
-              });
+              // If Zustand already has a persisted user, keep using it
+              const persisted = get().user;
+              if (persisted && persisted.id) {
+                console.log('ℹ️ Using persisted user from Zustand:', persisted.name);
+                set({ isAuthenticated: true, isLoading: false, error: null });
+              } else {
+                // No persisted data either – sign out
+                await supabaseSignOut();
+                set({ 
+                  user: null, 
+                  isAuthenticated: false, 
+                  isLoading: false, 
+                  error: null 
+                });
+              }
             }
           } else {
             console.log('ℹ️ No active session found');

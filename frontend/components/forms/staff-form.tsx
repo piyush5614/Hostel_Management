@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Staff } from '../../types';
 import { addStaff, updateStaffMember } from '../../store/mock-data';
 import { toast } from 'sonner';
-import { Copy, Check, Key } from 'lucide-react';
+import { Copy, Check, Key, Upload, X, Camera } from 'lucide-react';
 
 interface StaffFormProps {
   staff?: Staff;
@@ -35,6 +35,18 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCreds, setGeneratedCreds] = useState<{ id: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string>('');
+  const staffImgRef = useRef<HTMLInputElement>(null);
+
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select a valid image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setFormData(prev => ({ ...prev, profileImage: ev.target?.result as string }));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,12 +266,25 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
           onChange={(e) => handleChange('qualifications', e.target.value)}
           placeholder="e.g., B.Tech, ITI Electrician"
         />
-        <Input
-          label="Profile Image URL"
-          value={formData.profileImage}
-          onChange={(e) => handleChange('profileImage', e.target.value)}
-          placeholder="https://..."
-        />
+        <div>
+          <label className="block text-sm font-medium mb-2">Profile Image</label>
+          {formData.profileImage ? (
+            <div className="relative inline-block">
+              <img src={formData.profileImage} alt="Staff" className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200" />
+              <button type="button" onClick={() => setFormData(prev => ({ ...prev, profileImage: '' }))} className="absolute -top-2 -right-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600 shadow-md">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <div>
+              <input ref={staffImgRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileUpload} />
+              <Button type="button" variant="outline" onClick={() => staffImgRef.current?.click()} className="w-full">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Photo
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Input

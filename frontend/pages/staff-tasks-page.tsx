@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
@@ -10,12 +10,14 @@ import {
   AlertTriangle, ArrowRight, UserCircle,
   MessageSquare, Image, BarChart3, Filter, RefreshCw,
   Send, Loader2, Trash2, Upload, ThumbsUp, ThumbsDown,
+  Download, FileSpreadsheet, FileText, Mic, Play, Pause, Volume2,
 } from 'lucide-react';
 import {
   mockStaffTasks, mockStaff, updateStaffTask, deleteStaffTask,
   addTaskComment, reassignTask, getStaffWorkload, getLinkedStaffId,
 } from '../store/mock-data';
 import { mockPhotoSubmissions, PhotoSubmission } from '../store/enhanced-mock-data';
+import { exportService } from '../services/export';
 import { StaffTask } from '../types';
 import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { toast } from 'sonner';
@@ -41,7 +43,7 @@ export function StaffTasksPage() {
   const user = useAuthStore(s => s.user);
   const refreshKey = useDataRefresh([EVENTS.TASK_UPDATED, EVENTS.STAFF_UPDATED]);
   const isStaff = user?.role === 'staff';
-  const myStaffId = isStaff && user?.id ? getLinkedStaffId(user.id) : null;
+  const myStaffId = isStaff && user?.id ? getLinkedStaffId(user.id, user.email) : null;
   const [selectedTask, setSelectedTask] = useState<StaffTask | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -49,6 +51,7 @@ export function StaffTasksPage() {
   const [showWorkload, setShowWorkload] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [filter, setFilter] = useState({
     status: '',
     priority: '',
@@ -141,6 +144,25 @@ export function StaffTasksPage() {
 
   const canManage = user?.role === 'admin' || user?.role === 'warden';
 
+  const handleExport = (format: 'excel' | 'pdf' | 'csv') => {
+    const data = filteredTasks.map(t => ({
+      Title: t.title,
+      Description: t.description,
+      'Assigned To': getStaffName(t.assignedTo),
+      Category: t.category,
+      Priority: t.priority,
+      Status: t.status,
+      'Due Date': formatDate(t.dueDate),
+      'Created': formatDate(t.createdAt),
+      'Completed': t.completedAt ? formatDate(t.completedAt) : '-',
+      'Est. Hours': t.estimatedHours?.toString() || '-',
+      'Actual Hours': t.actualHours?.toString() || '-',
+    }));
+    exportService.generateReport('Staff Tasks Report', data, format);
+    setShowExportMenu(false);
+    toast.success(`Tasks exported as ${format.toUpperCase()}`);
+  };
+
   // Stats - for staff, show only their tasks; for admin/warden show all
   const taskSource = isStaff && myStaffId ? mockStaffTasks.filter(t => t.assignedTo === myStaffId) : mockStaffTasks;
   const stats = useMemo(() => ({
@@ -164,6 +186,28 @@ export function StaffTasksPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* Export Dropdown */}
+          {canManage && (
+            <div className="relative">
+              <Button variant="outline" onClick={() => setShowExportMenu(!showExportMenu)}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl border shadow-xl py-1 min-w-[160px] animate-in fade-in slide-in-from-top-2">
+                  <button onClick={() => handleExport('excel')} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <FileSpreadsheet className="h-4 w-4 text-green-600" /> Excel (.xls)
+                  </button>
+                  <button onClick={() => handleExport('pdf')} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <FileText className="h-4 w-4 text-red-600" /> PDF
+                  </button>
+                  <button onClick={() => handleExport('csv')} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <Download className="h-4 w-4 text-blue-600" /> CSV
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           {!isStaff && (
             <Button variant="outline" onClick={() => setShowWorkload(!showWorkload)}>
               <BarChart3 className="mr-2 h-4 w-4" />
@@ -188,41 +232,49 @@ export function StaffTasksPage() {
         <StatCard label="Overdue" value={stats.overdue} color="red" />
       </div>
 
-      {/* Workload Panel */}
+      {/* Workload Panel — Enhanced */}
       {showWorkload && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary-500" /> Staff Workload
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
+            <CardTitle className="text-base flex items-center gap-2 text-white">
+              <BarChart3 className="h-4 w-4" /> Staff Workload Overview
             </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {workload.map(w => (
-                <div key={w.staffId} className="rounded-xl border p-3 text-center hover:shadow-md transition-shadow">
-                  <p className="text-sm font-semibold truncate">{w.name}</p>
-                  <div className="flex justify-center gap-4 mt-2">
-                    <div>
-                      <p className="text-lg font-bold text-amber-600">{w.activeTasks}</p>
-                      <p className="text-[10px] text-muted-foreground">Active</p>
+          </div>
+          <CardContent className="p-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {workload.map(w => {
+                const loadPct = Math.min((w.activeTasks / 5) * 100, 100);
+                const loadColor = w.activeTasks > 3 ? 'text-red-500' : w.activeTasks > 1 ? 'text-amber-500' : 'text-green-500';
+                const barColor = w.activeTasks > 3 ? 'bg-red-500' : w.activeTasks > 1 ? 'bg-amber-500' : 'bg-green-500';
+                return (
+                  <div key={w.staffId} className="rounded-2xl border bg-white dark:bg-gray-800/50 p-4 hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 group">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold">
+                        {w.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <p className="text-sm font-semibold truncate flex-1">{w.name}</p>
                     </div>
-                    <div>
-                      <p className="text-lg font-bold text-green-600">{w.completedTasks}</p>
-                      <p className="text-[10px] text-muted-foreground">Done</p>
+                    <div className="flex justify-between gap-3 mb-3">
+                      <div className="text-center flex-1">
+                        <p className={cn('text-xl font-extrabold', loadColor)}>{w.activeTasks}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium">Active</p>
+                      </div>
+                      <div className="w-px bg-gray-200 dark:bg-gray-700" />
+                      <div className="text-center flex-1">
+                        <p className="text-xl font-extrabold text-green-600">{w.completedTasks}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium">Done</p>
+                      </div>
                     </div>
+                    <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all duration-700 ease-out', barColor)}
+                        style={{ width: `${loadPct}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 text-right">{Math.round(loadPct)}% capacity</p>
                   </div>
-                  {/* Workload bar */}
-                  <div className="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
-                    <div
-                      className={cn(
-                        'h-full rounded-full transition-all',
-                        w.activeTasks > 3 ? 'bg-red-500' : w.activeTasks > 1 ? 'bg-amber-500' : 'bg-green-500'
-                      )}
-                      style={{ width: `${Math.min((w.activeTasks / 5) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -307,13 +359,21 @@ export function StaffTasksPage() {
           </CardContent>
         </Card>
 
-        {/* Task List */}
-        <div className="lg:col-span-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Tasks ({filteredTasks.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
+        {/* Task List — Enhanced */}
+        <div className={selectedTask ? 'lg:col-span-4' : 'lg:col-span-9'}>
+          <Card className="border-0 shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/80 dark:to-gray-800/50 px-5 py-3 border-b">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-primary-500" />
+                  Tasks
+                </span>
+                <span className="text-xs font-normal bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 px-2.5 py-0.5 rounded-full">
+                  {filteredTasks.length}
+                </span>
+              </CardTitle>
+            </div>
+            <CardContent className="p-3">
               <div className="space-y-2 max-h-[calc(100vh-360px)] overflow-y-auto pr-1">
                 {filteredTasks.map(task => {
                   const staff = getStaff(task.assignedTo);
@@ -383,9 +443,12 @@ export function StaffTasksPage() {
                 })}
 
                 {filteredTasks.length === 0 && (
-                  <div className="py-12 text-center text-muted-foreground">
-                    <ListChecks className="mx-auto mb-2 h-12 w-12 opacity-30" />
-                    <p>No tasks found</p>
+                  <div className="py-16 text-center text-muted-foreground">
+                    <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <ListChecks className="h-10 w-10 opacity-40" />
+                    </div>
+                    <p className="text-base font-medium">No tasks found</p>
+                    <p className="text-sm mt-1">Try adjusting your filters</p>
                   </div>
                 )}
               </div>
@@ -394,8 +457,8 @@ export function StaffTasksPage() {
         </div>
 
         {/* Task Detail */}
-        <div className="lg:col-span-5">
-          {selectedTask ? (
+        {selectedTask && (
+          <div className="lg:col-span-5">
             <TaskDetailPanel
               task={selectedTask}
               canManage={canManage}
@@ -415,16 +478,8 @@ export function StaffTasksPage() {
                 if (updated) setSelectedTask({ ...updated });
               }}
             />
-          ) : (
-            <Card className="flex h-full min-h-[400px] items-center justify-center p-6 text-center text-muted-foreground">
-              <div>
-                <ListChecks className="mx-auto mb-3 h-16 w-16 opacity-20" />
-                <p className="text-lg font-medium">Select a Task</p>
-                <p className="text-sm mt-1">Click on a task to view details</p>
-              </div>
-            </Card>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Add Task Modal */}
@@ -455,29 +510,59 @@ export function StaffTasksPage() {
 }
 
 // ============================================================
-// Stats Card
+// Stats Card — Enhanced with icons and animated accents
 // ============================================================
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  const colors: Record<string, string> = {
-    blue: 'from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800',
-    amber: 'from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800',
-    green: 'from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800',
-    red: 'from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800',
-    indigo: 'from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 border-indigo-200 dark:border-indigo-800',
+  const configs: Record<string, { border: string; text: string; icon: typeof ListChecks; iconBg: string; iconColor: string }> = {
+    blue: {
+      border: 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900',
+      text: 'text-blue-700 dark:text-blue-300',
+      icon: ListChecks,
+      iconBg: 'bg-blue-100 dark:bg-blue-900/40',
+      iconColor: 'text-blue-600 dark:text-blue-400',
+    },
+    amber: {
+      border: 'border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900',
+      text: 'text-amber-700 dark:text-amber-300',
+      icon: Clock,
+      iconBg: 'bg-amber-100 dark:bg-amber-900/40',
+      iconColor: 'text-amber-600 dark:text-amber-400',
+    },
+    green: {
+      border: 'border-green-200 dark:border-green-800 bg-white dark:bg-gray-900',
+      text: 'text-green-700 dark:text-green-300',
+      icon: CheckCircle2,
+      iconBg: 'bg-green-100 dark:bg-green-900/40',
+      iconColor: 'text-green-600 dark:text-green-400',
+    },
+    red: {
+      border: 'border-red-200 dark:border-red-800 bg-white dark:bg-gray-900',
+      text: 'text-red-700 dark:text-red-300',
+      icon: AlertTriangle,
+      iconBg: 'bg-red-100 dark:bg-red-900/40',
+      iconColor: 'text-red-600 dark:text-red-400',
+    },
+    indigo: {
+      border: 'border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900',
+      text: 'text-indigo-700 dark:text-indigo-300',
+      icon: Loader2,
+      iconBg: 'bg-indigo-100 dark:bg-indigo-900/40',
+      iconColor: 'text-indigo-600 dark:text-indigo-400',
+    },
   };
-  const textColors: Record<string, string> = {
-    blue: 'text-blue-800 dark:text-blue-200',
-    amber: 'text-amber-800 dark:text-amber-200',
-    green: 'text-green-800 dark:text-green-200',
-    red: 'text-red-800 dark:text-red-200',
-    indigo: 'text-indigo-800 dark:text-indigo-200',
-  };
+  const c = configs[color] || configs.blue;
+  const Icon = c.icon;
 
   return (
-    <Card className={cn('bg-gradient-to-br', colors[color])}>
-      <CardContent className="p-3 text-center">
-        <p className={cn('text-2xl font-bold', textColors[color])}>{value}</p>
-        <p className="text-xs text-muted-foreground font-medium">{label}</p>
+    <Card className={cn('shadow-sm hover:shadow-md transition-all duration-200', c.border)}>
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={cn('rounded-xl p-2.5', c.iconBg)}>
+          <Icon className={cn('h-5 w-5', c.iconColor)} />
+        </div>
+        <div>
+          <p className={cn('text-2xl font-bold', c.text)}>{value}</p>
+          <p className="text-xs text-muted-foreground font-medium">{label}</p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -513,6 +598,7 @@ function TaskDetailPanel({
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const [reassignTo, setReassignTo] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const proofInputRef = useRef<HTMLInputElement>(null);
   const staff = mockStaff.find(s => s.id === task.assignedTo);
   const assignedByStaff = mockStaff.find(s => s.userId === task.assignedBy || s.id === task.assignedBy);
@@ -520,50 +606,100 @@ function TaskDetailPanel({
 
   const StatusIcon = statusConfig[task.status]?.icon;
 
-  const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    const newPhotos: string[] = [];
-    let processed = 0;
-    
-    Array.from(files).forEach(file => {
+  // Compress image using Canvas to keep base64 small enough for localStorage
+  const compressImage = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // For videos, just use a small placeholder (videos are too large for localStorage)
+      if (file.type.startsWith('video/')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.onerror = () => reject(new Error('Failed to read video'));
+        // Only accept small videos (< 500KB)
+        if (file.size > 500_000) {
+          reject(new Error('Video too large. Please use a video under 500KB or upload an image instead.'));
+          return;
+        }
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const img = new window.Image();
       const reader = new FileReader();
+
+      reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
       reader.onload = (ev) => {
-        if (ev.target?.result) {
-          newPhotos.push(ev.target.result as string);
-        }
-        processed++;
-        if (processed === files.length) {
-          const existing = task.workInProgressPhotos || [];
-          const allPhotos = [...existing, ...newPhotos];
-          updateStaffTask(task.id, {
-            workInProgressPhotos: allPhotos,
-            photoSubmissionStatus: 'pending',
-          });
-
-          // Also create a PhotoSubmission record so warden/admin dashboard can see it
-          const staffMember = mockStaff.find(s => s.id === task.assignedTo);
-          mockPhotoSubmissions.push({
-            id: `photo-${Date.now()}`,
-            taskId: task.id,
-            staffId: task.assignedTo,
-            photos: allPhotos,
-            submittedAt: new Date().toISOString(),
-            status: 'pending',
-            taskTitle: task.title,
-            staffName: staffMember?.name || 'Unknown Staff',
-          });
-
-          toast.success(`${newPhotos.length} proof file(s) uploaded — awaiting approval`);
-          onTaskRefresh(task.id);
-        }
+        img.onerror = () => reject(new Error(`Failed to load image: ${file.name}`));
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX = 800; // max width/height in pixels
+          let w = img.width;
+          let h = img.height;
+          if (w > MAX || h > MAX) {
+            if (w > h) { h = Math.round(h * (MAX / w)); w = MAX; }
+            else       { w = Math.round(w * (MAX / h)); h = MAX; }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Canvas not supported')); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          // Compress to JPEG at 60% quality — typically 30-80KB
+          const compressed = canvas.toDataURL('image/jpeg', 0.6);
+          resolve(compressed);
+        };
+        img.src = ev.target?.result as string;
       };
       reader.readAsDataURL(file);
     });
-    
-    // Reset file input
+  }, []);
+
+  const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const fileArray = Array.from(files);
+    // Reset file input immediately so re-selection works
     if (proofInputRef.current) proofInputRef.current.value = '';
+
+    try {
+      const compressed = await Promise.all(fileArray.map(f => compressImage(f)));
+      const newPhotos = compressed.filter(Boolean);
+
+      if (newPhotos.length === 0) {
+        toast.error('No valid files could be processed');
+        setIsUploading(false);
+        return;
+      }
+
+      const existing = task.workInProgressPhotos || [];
+      const allPhotos = [...existing, ...newPhotos];
+      updateStaffTask(task.id, {
+        workInProgressPhotos: allPhotos,
+        photoSubmissionStatus: 'pending',
+      });
+
+      // Also create a PhotoSubmission record so warden/admin dashboard can see it
+      const staffMember = mockStaff.find(s => s.id === task.assignedTo);
+      mockPhotoSubmissions.push({
+        id: `photo-${Date.now()}`,
+        taskId: task.id,
+        staffId: task.assignedTo,
+        photos: allPhotos,
+        submittedAt: new Date().toISOString(),
+        status: 'pending',
+        taskTitle: task.title,
+        staffName: staffMember?.name || 'Unknown Staff',
+      });
+
+      toast.success(`${newPhotos.length} proof file(s) uploaded — awaiting approval`);
+      onTaskRefresh(task.id);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload file(s)');
+      console.error('Photo upload error:', err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleApproveProof = () => {
@@ -579,14 +715,16 @@ function TaskDetailPanel({
   };
 
   return (
-    <Card className="overflow-hidden">
-      {/* Header */}
+    <Card className="overflow-hidden border-0 shadow-lg">
+      {/* Header — Enhanced with pattern */}
       <div className={cn(
-        'p-5',
-        task.priority === 'urgent' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white'
-          : task.priority === 'high' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white'
-          : 'bg-gradient-to-r from-primary-500 to-primary-600 text-white'
+        'p-5 relative overflow-hidden',
+        task.priority === 'urgent' ? 'bg-gradient-to-r from-red-500 via-red-600 to-rose-600 text-white'
+          : task.priority === 'high' ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white'
+          : 'bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 text-white'
       )}>
+        <div className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-white/10" />
+        <div className="absolute -top-4 -left-4 h-16 w-16 rounded-full bg-white/5" />
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
@@ -713,44 +851,61 @@ function TaskDetailPanel({
           )}
         </div>
 
-        {/* Work Photos & Proof Upload */}
-        <div>
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-            <Image className="h-3.5 w-3.5" /> Photos & Proof
+        {/* Work Photos & Proof Upload — Enhanced Gallery */}
+        <div className="rounded-2xl border bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-900/50 p-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <div className="rounded-lg bg-primary-100 dark:bg-primary-900/30 p-1.5">
+              <Image className="h-3.5 w-3.5 text-primary-600 dark:text-primary-400" />
+            </div>
+            Photos & Work Proof
           </h4>
           
-          {/* Existing photos */}
+          {/* Existing photos — gallery grid */}
           {(task.workInProgressPhotos?.length || task.attachments?.length) ? (
-            <div className="flex gap-2 flex-wrap mb-3">
+            <div className="grid grid-cols-3 gap-2 mb-3">
               {[...(task.workInProgressPhotos || []), ...(task.attachments || [])].map((url, i) => {
                 const isVideo = url.startsWith('data:video');
                 return isVideo ? (
-                  <video key={i} src={url} className="h-24 w-24 rounded-lg object-cover border cursor-pointer hover:scale-105 transition-transform" controls />
+                  <div key={i} className="relative group/media rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 aspect-square">
+                    <video src={url} className="h-full w-full object-cover" controls />
+                    <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/10 transition-colors" />
+                  </div>
                 ) : (
-                  <img key={i} src={url} alt="" className="h-16 w-16 rounded-lg object-cover border cursor-pointer hover:scale-105 transition-transform" />
+                  <div key={i} className="relative group/media rounded-xl overflow-hidden border-2 border-transparent hover:border-primary-400 transition-all aspect-square shadow-sm hover:shadow-md">
+                    <img src={url} alt="" className="h-full w-full object-cover group-hover/media:scale-110 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/10 transition-colors" />
+                  </div>
                 );
               })}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground mb-3">No proof uploaded yet</p>
+            <div className="flex items-center justify-center py-6 mb-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+              <div className="text-center">
+                <Image className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600 mb-1" />
+                <p className="text-xs text-muted-foreground">No proof uploaded yet</p>
+              </div>
+            </div>
           )}
           
-          {/* Photo submission status */}
+          {/* Photo submission status — enhanced badge */}
           {task.photoSubmissionStatus && (
             <div className="mb-3">
               <span className={cn(
-                'text-xs px-2 py-0.5 rounded-full font-medium',
-                task.photoSubmissionStatus === 'approved' && 'bg-green-100 text-green-700',
-                task.photoSubmissionStatus === 'pending' && 'bg-amber-100 text-amber-700',
-                task.photoSubmissionStatus === 'rejected' && 'bg-red-100 text-red-700',
+                'text-xs px-3 py-1 rounded-full font-semibold inline-flex items-center gap-1.5',
+                task.photoSubmissionStatus === 'approved' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                task.photoSubmissionStatus === 'pending' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                task.photoSubmissionStatus === 'rejected' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
               )}>
-                Proof Status: {task.photoSubmissionStatus.charAt(0).toUpperCase() + task.photoSubmissionStatus.slice(1)}
+                {task.photoSubmissionStatus === 'approved' && <CheckCircle2 className="h-3 w-3" />}
+                {task.photoSubmissionStatus === 'pending' && <Clock className="h-3 w-3" />}
+                {task.photoSubmissionStatus === 'rejected' && <XCircle className="h-3 w-3" />}
+                Proof: {task.photoSubmissionStatus.charAt(0).toUpperCase() + task.photoSubmissionStatus.slice(1)}
               </span>
             </div>
           )}
           
-          {/* Staff: Upload proof button */}
-          {isStaff && (task.status === 'in-progress' || task.status === 'completed') && (
+          {/* Upload proof button — staff (in-progress/completed) or admin/warden */}
+          {((isStaff && (task.status === 'in-progress' || task.status === 'completed')) || userRole === 'admin' || userRole === 'warden') && (
             <div>
               <input
                 ref={proofInputRef}
@@ -763,32 +918,36 @@ function TaskDetailPanel({
               <Button
                 variant="outline"
                 size="sm"
+                disabled={isUploading}
                 onClick={() => proofInputRef.current?.click()}
-                className="w-full"
+                className="w-full border-dashed border-2 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
               >
-                <Upload className="mr-2 h-3.5 w-3.5" />
-                Upload Proof (Image/Video)
+                {isUploading ? (
+                  <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Processing...</>
+                ) : (
+                  <><Upload className="mr-2 h-3.5 w-3.5" /> Upload Photo / Video Proof</>
+                )}
               </Button>
             </div>
           )}
           
-          {/* Admin/Warden: Approve/Reject proof buttons */}
+          {/* Admin/Warden: Approve/Reject proof buttons — enhanced */}
           {(userRole === 'admin' || userRole === 'warden') && task.photoSubmissionStatus === 'pending' && (task.workInProgressPhotos?.length || 0) > 0 && (
             <div className="flex gap-2 mt-2">
               <Button
                 size="sm"
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md"
                 onClick={handleApproveProof}
               >
-                <ThumbsUp className="mr-2 h-3.5 w-3.5" /> Approve Proof
+                <ThumbsUp className="mr-2 h-3.5 w-3.5" /> Approve
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
+                className="flex-1 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
                 onClick={handleRejectProof}
               >
-                <ThumbsDown className="mr-2 h-3.5 w-3.5" /> Reject Proof
+                <ThumbsDown className="mr-2 h-3.5 w-3.5" /> Reject
               </Button>
             </div>
           )}
@@ -802,51 +961,66 @@ function TaskDetailPanel({
           </div>
         )}
 
-        {/* Comments */}
-        <div>
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-            <MessageSquare className="h-3.5 w-3.5" /> Comments ({task.comments?.length || 0})
+        {/* Voice Message from Admin/Warden */}
+        {task.voiceMessage && (
+          <VoiceMessagePlayer audioSrc={task.voiceMessage} />
+        )}
+
+        {/* Comments — Enhanced */}
+        <div className="rounded-2xl border bg-gradient-to-br from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50 p-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <div className="rounded-lg bg-blue-100 dark:bg-blue-900/30 p-1.5">
+              <MessageSquare className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            </div>
+            Comments
+            <span className="ml-auto text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">{task.comments?.length || 0}</span>
           </h4>
-          <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
+          <div className="space-y-2 mb-3 max-h-36 overflow-y-auto">
             {(task.comments || []).map(c => (
-              <div key={c.id} className="rounded-lg bg-gray-50 dark:bg-gray-800/50 p-2.5">
+              <div key={c.id} className="rounded-xl bg-white dark:bg-gray-800 p-3 shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-1">
+                  <div className="h-5 w-5 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-[8px] text-white font-bold">
+                    {c.userName.charAt(0)}
+                  </div>
                   <span className="text-xs font-semibold">{c.userName}</span>
-                  <span className="text-[10px] text-muted-foreground">{formatDateTime(c.timestamp)}</span>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{formatDateTime(c.timestamp)}</span>
                 </div>
-                <p className="text-sm">{c.content}</p>
+                <p className="text-sm pl-7">{c.content}</p>
               </div>
             ))}
+            {(!task.comments || task.comments.length === 0) && (
+              <p className="text-xs text-muted-foreground text-center py-3">No comments yet</p>
+            )}
           </div>
           <div className="flex gap-2">
             <input
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="Add a comment..."
-              className="flex-1 rounded-lg border px-3 py-1.5 text-sm dark:bg-gray-800 dark:border-gray-600"
+              className="flex-1 rounded-xl border-2 border-gray-200 dark:border-gray-600 px-3 py-2 text-sm dark:bg-gray-800 focus:border-primary-400 focus:outline-none transition-colors"
               onKeyDown={(e) => e.key === 'Enter' && onAddComment(task.id)}
             />
-            <Button size="sm" onClick={() => onAddComment(task.id)} disabled={!commentText.trim()}>
+            <Button size="sm" onClick={() => onAddComment(task.id)} disabled={!commentText.trim()} className="rounded-xl px-3">
               <Send className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
 
-        {/* Status Actions — staff can update their own task status, admin/warden can manage all */}
+        {/* Status Actions — Enhanced with gradients */}
         {(canManage || isStaff) && task.status !== 'cancelled' && (
-          <div className="flex gap-2 pt-2 border-t">
+          <div className="flex gap-2 pt-3 border-t-2 border-dashed border-gray-200 dark:border-gray-700">
             {task.status === 'pending' && (
-              <Button className="flex-1" onClick={() => onStatusUpdate(task, 'in-progress')}>
+              <Button className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md rounded-xl" onClick={() => onStatusUpdate(task, 'in-progress')}>
                 <ArrowRight className="mr-2 h-3.5 w-3.5" /> Start Task
               </Button>
             )}
             {task.status === 'in-progress' && (
-              <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => onStatusUpdate(task, 'completed')}>
+              <Button className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md rounded-xl" onClick={() => onStatusUpdate(task, 'completed')}>
                 <CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Mark Complete
               </Button>
             )}
             {canManage && (task.status === 'pending' || task.status === 'in-progress') && (
-              <Button variant="outline" className="flex-1" onClick={() => onStatusUpdate(task, 'cancelled')}>
+              <Button variant="outline" className="flex-1 rounded-xl hover:bg-red-50 hover:border-red-300 hover:text-red-600 dark:hover:bg-red-900/20" onClick={() => onStatusUpdate(task, 'cancelled')}>
                 <XCircle className="mr-2 h-3.5 w-3.5" /> Cancel
               </Button>
             )}
@@ -854,5 +1028,110 @@ function TaskDetailPanel({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ============================================================
+// Voice Message Player Component
+// ============================================================
+function VoiceMessagePlayer({ audioSrc }: { audioSrc: string }) {
+  const [isVoicePlaying, setIsVoicePlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+
+  const initAudio = () => {
+    if (!voiceAudioRef.current) {
+      const audio = new Audio(audioSrc);
+      audio.onloadedmetadata = () => setDuration(audio.duration);
+      audio.onended = () => {
+        setIsVoicePlaying(false);
+        setProgress(0);
+        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      };
+      voiceAudioRef.current = audio;
+    }
+    return voiceAudioRef.current;
+  };
+
+  const updateProgress = () => {
+    const audio = voiceAudioRef.current;
+    if (audio && audio.duration) {
+      setProgress((audio.currentTime / audio.duration) * 100);
+    }
+    animFrameRef.current = requestAnimationFrame(updateProgress);
+  };
+
+  const toggle = () => {
+    const audio = initAudio();
+    if (isVoicePlaying) {
+      audio.pause();
+      setIsVoicePlaying(false);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    } else {
+      audio.play();
+      setIsVoicePlaying(true);
+      animFrameRef.current = requestAnimationFrame(updateProgress);
+    }
+  };
+
+  const fmt = (s: number) => {
+    if (!s || !isFinite(s)) return '0:00';
+    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="rounded-2xl border bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 dark:from-violet-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 p-4">
+      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+        <div className="rounded-lg bg-violet-100 dark:bg-violet-900/30 p-1.5">
+          <Volume2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+        </div>
+        Voice Message from Admin
+      </h4>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={toggle}
+          className={cn(
+            'rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 flex-shrink-0',
+            isVoicePlaying
+              ? 'bg-violet-600 hover:bg-violet-700 text-white'
+              : 'bg-gradient-to-br from-violet-500 to-purple-600 text-white'
+          )}
+        >
+          {isVoicePlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          {/* Waveform-style progress bar */}
+          <div className="relative h-8 flex items-center gap-[2px]">
+            {Array.from({ length: 40 }).map((_, i) => {
+              const barHeight = 20 + Math.sin(i * 0.8) * 40 + Math.cos(i * 1.3) * 20;
+              const filled = (i / 40) * 100 <= progress;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex-1 rounded-full transition-colors duration-150',
+                    filled ? 'bg-violet-500 dark:bg-violet-400' : 'bg-violet-200 dark:bg-violet-800'
+                  )}
+                  style={{ height: `${Math.max(barHeight, 15)}%` }}
+                />
+              );
+            })}
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-[10px] text-muted-foreground font-medium">
+              {voiceAudioRef.current ? fmt(voiceAudioRef.current.currentTime) : '0:00'}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium">
+              {fmt(duration)}
+            </span>
+          </div>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
+        <Mic className="h-3 w-3" /> Listen to the recorded instructions for this task
+      </p>
+    </div>
   );
 }

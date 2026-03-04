@@ -9,9 +9,10 @@ import {
   Users, Search, Plus, Edit, Trash2, UserCircle,
   Phone, Mail, MapPin, Calendar, Clock, Shield,
   Briefcase, Building2, AlertCircle,
-  Activity, BadgeCheck,
+  Activity, BadgeCheck, Download, FileSpreadsheet, FileText,
 } from 'lucide-react';
 import { mockStaff, deleteStaffMember, getTasksByStaff } from '../store/mock-data';
+import { exportService } from '../services/export';
 import { Staff } from '../types';
 import { cn, formatDate } from '../lib/utils';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ export function StaffPage() {
     shiftTiming: '',
     status: '',
   });
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const filteredStaff = useMemo(() => {
     let result = [...mockStaff];
@@ -118,6 +120,28 @@ export function StaffPage() {
 
   const canManage = user?.role === 'admin' || user?.role === 'warden';
 
+  const handleExport = (format: 'excel' | 'pdf' | 'csv') => {
+    const data = filteredStaff.map(s => {
+      const tasks = getTasksByStaff(s.id);
+      return {
+        Name: s.name,
+        'Employee ID': s.employeeId,
+        Email: s.email,
+        Phone: s.contactNumber,
+        Department: s.department,
+        Position: s.position,
+        Shift: s.shiftTiming,
+        Status: s.isActive ? 'Active' : 'Inactive',
+        'Joining Date': formatDate(s.joiningDate),
+        'Active Tasks': tasks.filter(t => t.status === 'pending' || t.status === 'in-progress').length.toString(),
+        'Completed Tasks': tasks.filter(t => t.status === 'completed').length.toString(),
+      };
+    });
+    exportService.generateReport('Staff Report', data, format);
+    setShowExportMenu(false);
+    toast.success(`Staff data exported as ${format.toUpperCase()}`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -132,6 +156,26 @@ export function StaffPage() {
         </div>
         {canManage && (
           <div className="flex gap-2">
+            {/* Export Dropdown */}
+            <div className="relative">
+              <Button variant="outline" onClick={() => setShowExportMenu(!showExportMenu)}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl border shadow-xl py-1 min-w-[160px] animate-in fade-in slide-in-from-top-2">
+                  <button onClick={() => handleExport('excel')} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <FileSpreadsheet className="h-4 w-4 text-green-600" /> Excel (.xls)
+                  </button>
+                  <button onClick={() => handleExport('pdf')} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <FileText className="h-4 w-4 text-red-600" /> PDF
+                  </button>
+                  <button onClick={() => handleExport('csv')} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <Download className="h-4 w-4 text-blue-600" /> CSV
+                  </button>
+                </div>
+              )}
+            </div>
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Staff
@@ -140,49 +184,57 @@ export function StaffPage() {
         )}
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — Clean with subtle color accents */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+        <Card className="border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-all">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Total Staff</p>
-                <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">{mockStaff.filter(s => !s.deletedAt).length}</p>
+                <p className="text-xs font-medium text-muted-foreground">Total Staff</p>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{mockStaff.filter(s => !s.deletedAt).length}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-500 opacity-60" />
+              <div className="rounded-xl bg-blue-100 dark:bg-blue-900/40 p-2.5">
+                <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+        <Card className="border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-all">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-green-600 dark:text-green-400">Active</p>
-                <p className="text-2xl font-bold text-green-800 dark:text-green-200">{mockStaff.filter(s => s.isActive).length}</p>
+                <p className="text-xs font-medium text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300">{mockStaff.filter(s => s.isActive).length}</p>
               </div>
-              <BadgeCheck className="h-8 w-8 text-green-500 opacity-60" />
+              <div className="rounded-xl bg-green-100 dark:bg-green-900/40 p-2.5">
+                <BadgeCheck className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800">
+        <Card className="border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-all">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">On Duty</p>
-                <p className="text-2xl font-bold text-amber-800 dark:text-amber-200">{mockStaff.filter(s => s.isActive && isCurrentlyOnDuty(s)).length}</p>
+                <p className="text-xs font-medium text-muted-foreground">On Duty</p>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{mockStaff.filter(s => s.isActive && isCurrentlyOnDuty(s)).length}</p>
               </div>
-              <Clock className="h-8 w-8 text-amber-500 opacity-60" />
+              <div className="rounded-xl bg-amber-100 dark:bg-amber-900/40 p-2.5">
+                <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+        <Card className="border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-all">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-purple-600 dark:text-purple-400">Departments</p>
-                <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">{departments.length}</p>
+                <p className="text-xs font-medium text-muted-foreground">Departments</p>
+                <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{departments.length}</p>
               </div>
-              <Building2 className="h-8 w-8 text-purple-500 opacity-60" />
+              <div className="rounded-xl bg-purple-100 dark:bg-purple-900/40 p-2.5">
+                <Building2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -259,12 +311,20 @@ export function StaffPage() {
           </CardContent>
         </Card>
 
-        {/* Staff List */}
-        <div className="lg:col-span-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Staff Members ({filteredStaff.length})</CardTitle>
-            </CardHeader>
+        {/* Staff List — Enhanced */}
+        <div className={selectedStaff ? 'lg:col-span-4' : 'lg:col-span-9'}>
+          <Card className="border-0 shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/80 dark:to-gray-800/50 px-5 py-3 border-b">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary-500" />
+                  Staff Members
+                </span>
+                <span className="text-xs font-normal bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 px-2.5 py-0.5 rounded-full">
+                  {filteredStaff.length}
+                </span>
+              </CardTitle>
+            </div>
             <CardContent>
               <div className="space-y-2 max-h-[calc(100vh-360px)] overflow-y-auto pr-1">
                 {filteredStaff.map((staff) => {
@@ -340,9 +400,12 @@ export function StaffPage() {
                 })}
 
                 {filteredStaff.length === 0 && (
-                  <div className="py-12 text-center text-muted-foreground">
-                    <Users className="mx-auto mb-2 h-12 w-12 opacity-30" />
-                    <p>No staff members found</p>
+                  <div className="py-16 text-center text-muted-foreground">
+                    <div className="mx-auto mb-4 h-20 w-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <Users className="h-10 w-10 opacity-40" />
+                    </div>
+                    <p className="text-base font-medium">No staff members found</p>
+                    <p className="text-sm mt-1">Try adjusting your filters</p>
                   </div>
                 )}
               </div>
@@ -351,24 +414,16 @@ export function StaffPage() {
         </div>
 
         {/* Staff Details */}
-        <div className="lg:col-span-5">
-          {selectedStaff ? (
+        {selectedStaff && (
+          <div className="lg:col-span-5">
             <StaffDetailPanel
               staff={selectedStaff}
               onEdit={() => handleEditStaff(selectedStaff)}
               onViewProfile={() => setIsProfileModalOpen(true)}
               canManage={canManage}
             />
-          ) : (
-            <Card className="flex h-full min-h-[400px] items-center justify-center p-6 text-center text-muted-foreground">
-              <div>
-                <Users className="mx-auto mb-3 h-16 w-16 opacity-20" />
-                <p className="text-lg font-medium">Select a Staff Member</p>
-                <p className="text-sm mt-1">Click on a staff member to view their details</p>
-              </div>
-            </Card>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Add Staff Modal */}
@@ -429,9 +484,11 @@ function StaffDetailPanel({
   })();
 
   return (
-    <Card className="overflow-hidden">
-      {/* Header Banner */}
-      <div className="relative bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 p-6 text-white">
+    <Card className="overflow-hidden border-0 shadow-lg">
+      {/* Header Banner — Enhanced with pattern */}
+      <div className="relative bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 p-6 text-white overflow-hidden">
+        <div className="absolute -bottom-8 -right-8 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute -top-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
         <div className="flex items-start gap-4">
           <div className="relative">
             {staff.profileImage ? (
@@ -486,23 +543,26 @@ function StaffDetailPanel({
           <InfoItem icon={<MapPin className="h-4 w-4" />} label="Address" value={staff.address} truncate />
         </div>
 
-        {/* Task Summary */}
-        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4">
+        {/* Task Summary — Enhanced */}
+        <div className="rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-900/50 p-4 border">
           <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary-500" /> Task Overview
+            <div className="rounded-lg bg-primary-100 dark:bg-primary-900/30 p-1.5">
+              <Activity className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+            </div>
+            Task Overview
           </h4>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-lg bg-white dark:bg-gray-700 p-2.5 shadow-sm">
-              <p className="text-lg font-bold text-amber-600">{activeTasks.length}</p>
-              <p className="text-[10px] text-muted-foreground font-medium">Active</p>
+            <div className="rounded-xl bg-white dark:bg-gray-700 p-3 shadow-sm border border-amber-100 dark:border-amber-800/30 hover:shadow-md transition-shadow">
+              <p className="text-2xl font-extrabold text-amber-600">{activeTasks.length}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Active</p>
             </div>
-            <div className="rounded-lg bg-white dark:bg-gray-700 p-2.5 shadow-sm">
-              <p className="text-lg font-bold text-green-600">{completedTasks.length}</p>
-              <p className="text-[10px] text-muted-foreground font-medium">Completed</p>
+            <div className="rounded-xl bg-white dark:bg-gray-700 p-3 shadow-sm border border-green-100 dark:border-green-800/30 hover:shadow-md transition-shadow">
+              <p className="text-2xl font-extrabold text-green-600">{completedTasks.length}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Completed</p>
             </div>
-            <div className="rounded-lg bg-white dark:bg-gray-700 p-2.5 shadow-sm">
-              <p className="text-lg font-bold text-blue-600">{tasks.length}</p>
-              <p className="text-[10px] text-muted-foreground font-medium">Total</p>
+            <div className="rounded-xl bg-white dark:bg-gray-700 p-3 shadow-sm border border-blue-100 dark:border-blue-800/30 hover:shadow-md transition-shadow">
+              <p className="text-2xl font-extrabold text-blue-600">{tasks.length}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Total</p>
             </div>
           </div>
         </div>
@@ -522,13 +582,13 @@ function StaffDetailPanel({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-2">
-          <Button variant="outline" className="flex-1" onClick={onViewProfile}>
+        {/* Actions — Enhanced */}
+        <div className="flex gap-2 pt-3 border-t-2 border-dashed border-gray-200 dark:border-gray-700">
+          <Button variant="outline" className="flex-1 rounded-xl hover:bg-primary-50 hover:border-primary-300 dark:hover:bg-primary-900/20" onClick={onViewProfile}>
             View Full Profile
           </Button>
           {canManage && (
-            <Button className="flex-1" onClick={onEdit}>
+            <Button className="flex-1 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-md rounded-xl" onClick={onEdit}>
               <Edit className="mr-2 h-3.5 w-3.5" /> Edit Staff
             </Button>
           )}

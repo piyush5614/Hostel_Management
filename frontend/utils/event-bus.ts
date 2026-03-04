@@ -32,6 +32,7 @@ export const eventBus = new EventBus();
 export const EVENTS = {
   ATTENDANCE_UPDATED: 'attendance-updated',
   LEAVE_UPDATED: 'leave-updated',
+  STAFF_LEAVE_UPDATED: 'staff-leave-updated',
   TASK_UPDATED: 'task-updated',
   STUDENT_UPDATED: 'student-updated',
   STAFF_UPDATED: 'staff-updated',

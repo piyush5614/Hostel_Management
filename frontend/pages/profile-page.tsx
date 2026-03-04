@@ -198,33 +198,40 @@ export function ProfilePage() {
             </div>
           </div>
           
-          {!isEditing ? (
-            <Button 
-              onClick={() => setIsEditing(true)}
-              variant="secondary"
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50 backdrop-blur-sm"
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Profile
-            </Button>
-          ) : (
-            <div className="flex space-x-2">
+          {user?.role !== 'student' && (
+            !isEditing ? (
               <Button 
-                variant="outline" 
-                onClick={handleCancel}
+                onClick={() => setIsEditing(true)}
+                variant="secondary"
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50 backdrop-blur-sm"
               >
-                <X className="mr-2 h-4 w-4" />
-                Cancel
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Profile
               </Button>
-              <Button 
-                onClick={handleSave}
-                className="bg-white text-primary-700 hover:bg-white/90 shadow-lg"
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
-              </Button>
-            </div>
+            ) : (
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancel}
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50 backdrop-blur-sm"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSave}
+                  className="bg-white text-primary-700 hover:bg-white/90 shadow-lg"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
+            )
+          )}
+          {user?.role === 'student' && (
+            <span className="text-sm text-primary-200 bg-white/10 px-3 py-1.5 rounded-full">
+              View Only
+            </span>
           )}
         </div>
       </div>
@@ -251,13 +258,15 @@ export function ProfilePage() {
                   {user.name.charAt(0)}
                 </div>
               )}
-              <button
-                onClick={() => setIsImageModalOpen(true)}
-                className="absolute bottom-2 right-2 rounded-full bg-gradient-to-r from-primary-600 to-primary-700 p-3 text-white hover:from-primary-700 hover:to-primary-800 shadow-xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 border-3 border-white group-hover:animate-pulse"
-                title="Change profile picture"
-              >
-                <Camera className="h-5 w-5" />
-              </button>
+              {user?.role !== 'student' && (
+                <button
+                  onClick={() => setIsImageModalOpen(true)}
+                  className="absolute bottom-2 right-2 rounded-full bg-gradient-to-r from-primary-600 to-primary-700 p-3 text-white hover:from-primary-700 hover:to-primary-800 shadow-xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 border-3 border-white group-hover:animate-pulse"
+                  title="Change profile picture"
+                >
+                  <Camera className="h-5 w-5" />
+                </button>
+              )}
             </div>
             
             <div className="space-y-2">

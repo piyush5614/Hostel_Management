@@ -17,9 +17,12 @@ import { VisitorManagementPage } from './pages/visitor-management-page';
 import { StaffPage } from './pages/staff-page';
 import { StaffTasksPage } from './pages/staff-tasks-page';
 import { CredentialManagementPage } from './pages/credential-management-page';
+import { QRScannerPage } from './pages/qr-scanner-page';
 import { StaffStudentView } from './pages/students/staff-student-view';
 import { MainLayout } from './components/layout/main-layout';
 import { ParentApprovalPage } from './components/parent-approval/parent-approval-page';
+import { TaskStartPage } from './pages/task-start-page';
+import { ErrorBoundary } from './components/error-boundary/error-boundary';
 import { useAuthStore } from './store/auth-store';
 import { useEffect } from 'react';
 
@@ -73,6 +76,7 @@ function App() {
   }
   
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         {/* Public route - Login page */}
@@ -80,6 +84,9 @@ function App() {
         
         {/* Public route - Parent approval page */}
         <Route path="/approve/:approvalCode" element={<ParentApprovalPage />} />
+        
+        {/* Public route - Auto-login from email task notification */}
+        <Route path="/task-start" element={<TaskStartPage />} />
         
         {/* Protected routes - Main application */}
         <Route
@@ -96,6 +103,7 @@ function App() {
           <Route path="rooms" element={<RoomsPage />} />
           <Route path="students" element={<StudentsPage />} />
           <Route path="leave" element={<LeaveManagementPage />} />
+          <Route path="scan" element={<QRScannerPage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="applications" element={<ApplicationsPage />} />
           <Route path="reports" element={<ReportsPage />} />
@@ -115,6 +123,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

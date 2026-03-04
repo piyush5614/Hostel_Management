@@ -5,9 +5,10 @@ import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockMaintenanceRequests, mockRooms, exportData } from '../store/mock-data';
+import { mockMaintenanceRequests, mockRooms } from '../store/mock-data';
+import { exportService } from '../services/export';
 import { MaintenanceRequest } from '../types';
-import { Wrench, Plus, Download, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Wrench, Plus, Download, AlertTriangle, Clock, CheckCircle, XCircle, FileSpreadsheet, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
@@ -16,6 +17,7 @@ export function MaintenancePage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -98,11 +100,22 @@ export function MaintenancePage() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'excel' | 'pdf' | 'csv') => {
     setIsExporting(true);
+    setShowExportMenu(false);
     try {
-      const result = await exportData('maintenance', 'excel');
-      toast.success('Maintenance report exported successfully!');
+      const headers = ['Title', 'Category', 'Priority', 'Status', 'Room', 'Created', 'Completed'];
+      const data = mockMaintenanceRequests.map(r => ({
+        Title: r.title,
+        Category: r.category,
+        Priority: r.priority,
+        Status: r.status,
+        Room: r.roomId ? mockRooms.find(rm => rm.id === r.roomId)?.number || '' : '',
+        Created: new Date(r.createdAt).toLocaleDateString(),
+        Completed: r.completedAt ? new Date(r.completedAt).toLocaleDateString() : '-',
+      }));
+      exportService.generateReport('Maintenance Requests Report', data, format, headers);
+      toast.success(`Maintenance report exported as ${format.toUpperCase()}!`);
     } catch (error) {
       toast.error('Failed to export maintenance report');
     } finally {
@@ -117,14 +130,41 @@ export function MaintenancePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Maintenance Management</h1>
         <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {isExporting ? 'Exporting...' : 'Export Report'}
-          </Button>
+          <div className="relative">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={isExporting}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? 'Exporting...' : 'Export Report'}
+            </Button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border z-50 py-1 animate-in fade-in slide-in-from-top-2">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => handleExport('excel')}
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                  <span className="font-medium">Excel (.xls)</span>
+                </button>
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => handleExport('pdf')}
+                >
+                  <FileText className="h-4 w-4 text-red-600" />
+                  <span className="font-medium">PDF</span>
+                </button>
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => handleExport('csv')}
+                >
+                  <Download className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium">CSV</span>
+                </button>
+              </div>
+            )}
+          </div>
           {canCreateRequest && (
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -195,7 +235,7 @@ export function MaintenancePage() {
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Maintenance Requests List */}
-        <div className="md:col-span-2">
+        <div className={selectedRequest ? 'md:col-span-2' : 'md:col-span-3'}>
           <Card>
             <CardHeader>
               <CardTitle>
@@ -306,8 +346,8 @@ export function MaintenancePage() {
         </div>
 
         {/* Request Details */}
+        {selectedRequest && (
         <div>
-          {selectedRequest ? (
             <Card>
               <CardHeader>
                 <CardTitle>Request Details</CardTitle>
@@ -384,15 +424,8 @@ export function MaintenancePage() {
                 )}
               </CardContent>
             </Card>
-          ) : (
-            <Card className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-              <div>
-                <Wrench className="mx-auto mb-2 h-12 w-12 opacity-30" />
-                <p>Select a request to view details</p>
-              </div>
-            </Card>
-          )}
         </div>
+        )}
       </div>
 
       {/* Create Maintenance Request Modal */}

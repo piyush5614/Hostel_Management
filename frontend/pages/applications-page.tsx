@@ -44,6 +44,7 @@ export function ApplicationsPage() {
       id: Date.now().toString(),
       studentId: user?.id || '',
       ...formData,
+      urgency: 'medium',
       status: 'pending',
       submittedAt: new Date().toISOString(),
     };

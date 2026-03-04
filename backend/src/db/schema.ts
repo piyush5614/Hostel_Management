@@ -9,6 +9,7 @@ export async function createSchema(db: Database): Promise<void> {
       name TEXT NOT NULL,
       role TEXT CHECK(role IN ('admin', 'warden', 'staff', 'student')) DEFAULT 'student',
       profile_image TEXT,
+      generated_id TEXT UNIQUE,
       is_active INTEGER DEFAULT 1,
       last_login TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -30,6 +31,9 @@ export async function createSchema(db: Database): Promise<void> {
       medical_notes TEXT,
       room_id TEXT,
       bed_id TEXT,
+      profile_image TEXT,
+      parent_image_1 TEXT,
+      parent_image_2 TEXT,
       joining_date TEXT,
       current_status TEXT DEFAULT 'present',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -114,8 +118,13 @@ export async function createSchema(db: Database): Promise<void> {
       reviewed_by TEXT,
       approval_code TEXT,
       parent_approval_status TEXT DEFAULT 'pending',
+      parent_call_verified INTEGER DEFAULT 0,
+      parent_call_timestamp TEXT,
+      parent_call_notes TEXT,
+      parent_call_by TEXT,
       FOREIGN KEY(student_id) REFERENCES students(id),
-      FOREIGN KEY(reviewed_by) REFERENCES users(id)
+      FOREIGN KEY(reviewed_by) REFERENCES users(id),
+      FOREIGN KEY(parent_call_by) REFERENCES users(id)
     );
 
     CREATE TABLE IF NOT EXISTS maintenance_requests (
@@ -147,6 +156,8 @@ export async function createSchema(db: Database): Promise<void> {
       check_out_time TEXT,
       id_proof_type TEXT,
       id_proof_number TEXT,
+      vehicle_number TEXT,
+      photo TEXT,
       approved_by TEXT NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(student_id) REFERENCES students(id),

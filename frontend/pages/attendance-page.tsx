@@ -37,7 +37,7 @@ export function AttendancePage() {
   // For student: resolve their linked student record
   const myStudentId = useMemo(() => {
     if (!isStudent || !user?.id) return null;
-    return getLinkedStudentId(user.id);
+    return getLinkedStudentId(user.id, user.email);
   }, [user?.id, isStudent]);
 
   const myStudent = useMemo(() => {
@@ -415,9 +415,10 @@ export function AttendancePage() {
               label="Floor"
               options={[
                 { value: '', label: 'All Floors' },
-                { value: '1', label: 'Floor 1' },
-                { value: '2', label: 'Floor 2' },
-                { value: '3', label: 'Floor 3' },
+                ...[...new Set(mockRooms.map(r => r.floor))].sort((a, b) => a - b).map(floor => ({
+                  value: floor.toString(),
+                  label: `Floor ${floor}`
+                }))
               ]}
               value={selectedFloor}
               onChange={(e) => {

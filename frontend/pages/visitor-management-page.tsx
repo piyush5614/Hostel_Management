@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
 import { mockVisitors, mockStudents, mockStaff, exportData } from '../store/mock-data';
 import { Visitor } from '../types';
-import { Users, Plus, Download, LogIn, LogOut, Clock } from 'lucide-react';
+import { Users, Plus, Download, LogIn, LogOut, Clock, Camera, Upload, X, Image } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
@@ -25,7 +25,10 @@ export function VisitorManagementPage() {
     idProofType: 'aadhar',
     idProofNumber: '',
     vehicleNumber: '',
+    photo: '',
   });
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
+  const galleryInputRef = React.useRef<HTMLInputElement>(null);
 
   const getVisitorStats = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -65,6 +68,7 @@ export function VisitorManagementPage() {
       idProofType: 'aadhar',
       idProofNumber: '',
       vehicleNumber: '',
+      photo: '',
     });
   };
 
@@ -199,9 +203,17 @@ export function VisitorManagementPage() {
                     onClick={() => setSelectedVisitor(visitor)}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <h3 className="font-semibold">{visitor.name}</h3>
+                      <div className="flex items-start space-x-3 flex-1">
+                        {visitor.photo ? (
+                          <img src={visitor.photo} alt={visitor.name} className="h-10 w-10 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 flex-shrink-0">
+                            <Users className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h3 className="font-semibold">{visitor.name}</h3>
                           {!visitor.checkOutTime && (
                             <span className="rounded-full bg-success-100 px-2 py-1 text-xs font-medium text-success-700">
                               Inside
@@ -226,6 +238,7 @@ export function VisitorManagementPage() {
                               Duration: {Math.floor(visitor.visitDuration / 60)}h {visitor.visitDuration % 60}m
                             </span>
                           )}
+                        </div>
                         </div>
                       </div>
                       
@@ -280,10 +293,17 @@ export function VisitorManagementPage() {
                   <p className="text-sm">{getPersonName(selectedVisitor)}</p>
                 </div>
 
+                {selectedVisitor.photo && (
+                  <div>
+                    <p className="text-sm font-medium mb-1">Photo:</p>
+                    <img src={selectedVisitor.photo} alt={selectedVisitor.name} className="w-24 h-24 rounded-lg object-cover border" />
+                  </div>
+                )}
+
                 <div>
                   <p className="text-sm font-medium mb-1">ID Proof:</p>
                   <p className="text-sm capitalize">
-                    {selectedVisitor.idProofType}: {selectedVisitor.idProofNumber}
+                    {selectedVisitor.idProofType}{selectedVisitor.idProofNumber ? `: ${selectedVisitor.idProofNumber}` : ''}
                   </p>
                 </div>
 
@@ -437,11 +457,10 @@ export function VisitorManagementPage() {
               onChange={(e) => setFormData(prev => ({ ...prev, idProofType: e.target.value }))}
             />
             <Input
-              label="ID Proof Number"
+              label="ID Proof Number (Optional)"
               value={formData.idProofNumber}
               onChange={(e) => setFormData(prev => ({ ...prev, idProofNumber: e.target.value }))}
               placeholder="ID number"
-              required
             />
           </div>
 
@@ -451,6 +470,77 @@ export function VisitorManagementPage() {
             onChange={(e) => setFormData(prev => ({ ...prev, vehicleNumber: e.target.value }))}
             placeholder="Vehicle registration number"
           />
+
+          {/* Photo Capture Section */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Visitor Photo</label>
+            {formData.photo ? (
+              <div className="relative inline-block">
+                <img src={formData.photo} alt="Visitor" className="w-32 h-32 rounded-lg object-cover border-2 border-gray-200" />
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, photo: '' }))}
+                  className="absolute -top-2 -right-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600 shadow-md"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex space-x-3">
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith('image/')) { toast.error('Please select a valid image'); return; }
+                    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setFormData(prev => ({ ...prev, photo: ev.target?.result as string }));
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }}
+                />
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith('image/')) { toast.error('Please select a valid image'); return; }
+                    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setFormData(prev => ({ ...prev, photo: ev.target?.result as string }));
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex-1"
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  Take Photo
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex-1"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Photo
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>

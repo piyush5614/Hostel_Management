@@ -1,6 +1,6 @@
 import { 
   Student, Staff, Room, Bed, 
-  Attendance, StaffAttendance, LeaveRequest, 
+  Attendance, StaffAttendance, LeaveRequest, StaffLeaveRequest,
   MaintenanceRequest, Visitor, Message,
   Report, Application, StaffShift, StaffTask,
   DailyReport, AttendanceSheet, SystemSettings,
@@ -30,6 +30,7 @@ interface PersistedData {
   attendance: Attendance[];
   staffAttendance: StaffAttendance[];
   leaveRequests: LeaveRequest[];
+  staffLeaveRequests: StaffLeaveRequest[];
   maintenanceRequests: MaintenanceRequest[];
   visitors: Visitor[];
   messages: Message[];
@@ -57,6 +58,7 @@ const saveToStorage = () => {
       attendance: mockAttendance.slice(-2000), // cap to prevent oversized localStorage
       staffAttendance: mockStaffAttendance,
       leaveRequests: mockLeaveRequests,
+      staffLeaveRequests: mockStaffLeaveRequests,
       maintenanceRequests: mockMaintenanceRequests,
       visitors: mockVisitors,
       messages: mockMessages,
@@ -195,6 +197,7 @@ if (!persisted?.beds) {
 export let mockAttendance: Attendance[] = persisted?.attendance ?? getHistoricalAttendance();
 export let mockStaffAttendance: StaffAttendance[] = persisted?.staffAttendance ?? [];
 export let mockLeaveRequests: LeaveRequest[] = persisted?.leaveRequests ?? enhancedMockLeaveRequests;
+export let mockStaffLeaveRequests: StaffLeaveRequest[] = persisted?.staffLeaveRequests ?? [];
 export let mockMaintenanceRequests: MaintenanceRequest[] = persisted?.maintenanceRequests ?? [];
 export let mockVisitors: Visitor[] = persisted?.visitors ?? [];
 export let mockMessages: Message[] = persisted?.messages ?? [];
@@ -366,29 +369,49 @@ export const autoAssignStudents = (criteria: AutoAssignCriteria): { success: boo
 // ============================================================
 // Resolve logged-in user to their Student / Staff record
 // ============================================================
-export const getLinkedStudentId = (userId: string): string | null => {
+export const getLinkedStudentId = (userId: string, userEmail?: string): string | null => {
   // Try direct id match first (demo accounts: user.id === "1")
   let student = mockStudents.find(s => s.id === userId);
   if (student) return student.id;
   // Then try userId match (credential-based logins: user.id === "student-17373...")
   student = mockStudents.find(s => s.userId === userId);
-  return student?.id ?? null;
+  if (student) return student.id;
+  // Fallback: match by email (needed when userId is a backend UUID)
+  if (userEmail) {
+    student = mockStudents.find(s => s.email?.toLowerCase() === userEmail.toLowerCase());
+    if (student) return student.id;
+  }
+  // Demo account mapping: student@tchostel.edu → first student (Arjun Sharma)
+  if (userEmail?.toLowerCase() === 'student@tchostel.edu' && mockStudents.length > 0) {
+    return mockStudents[0].id;
+  }
+  return null;
 };
 
-export const getLinkedStaffId = (userId: string): string | null => {
+export const getLinkedStaffId = (userId: string, userEmail?: string): string | null => {
   let staff = mockStaff.find(s => s.id === userId);
   if (staff) return staff.id;
   staff = mockStaff.find(s => s.userId === userId);
-  return staff?.id ?? null;
+  if (staff) return staff.id;
+  // Fallback: match by email (needed when userId is a backend UUID)
+  if (userEmail) {
+    staff = mockStaff.find(s => s.email?.toLowerCase() === userEmail.toLowerCase());
+    if (staff) return staff.id;
+  }
+  // Demo account fallback: staff@tchostel.edu → first staff member (Dr. Rajesh Kumar)
+  if (userEmail?.toLowerCase() === 'staff@tchostel.edu' && mockStaff.length > 0) {
+    return mockStaff[0].id;
+  }
+  return null;
 };
 
-export const getLinkedStudent = (userId: string): Student | null => {
-  const id = getLinkedStudentId(userId);
+export const getLinkedStudent = (userId: string, userEmail?: string): Student | null => {
+  const id = getLinkedStudentId(userId, userEmail);
   return id ? mockStudents.find(s => s.id === id) ?? null : null;
 };
 
-export const getLinkedStaff = (userId: string): Staff | null => {
-  const id = getLinkedStaffId(userId);
+export const getLinkedStaff = (userId: string, userEmail?: string): Staff | null => {
+  const id = getLinkedStaffId(userId, userEmail);
   return id ? mockStaff.find(s => s.id === id) ?? null : null;
 };
 
@@ -573,20 +596,148 @@ export const rejectLeaveRequest = (id: string, approverComments?: string) => {
   return null;
 };
 
+// Record parent call verification for a leave request
+export const recordParentCall = (leaveRequestId: string, calledBy: string, notes?: string) => {
+  const requestIndex = mockLeaveRequests.findIndex(req => req.id === leaveRequestId);
+  if (requestIndex !== -1) {
+    mockLeaveRequests[requestIndex] = {
+      ...mockLeaveRequests[requestIndex],
+      parentCallVerified: true,
+      parentCallTimestamp: new Date().toISOString(),
+      parentCallBy: calledBy,
+      parentCallNotes: notes || '',
+    };
+    saveToStorage();
+    eventBus.emit(EVENTS.LEAVE_UPDATED);
+    return mockLeaveRequests[requestIndex];
+  }
+  return null;
+};
+
+// Find leave request by parent phone number (guardian contact)
+export const findLeaveByParentPhone = (phone: string) => {
+  // Normalize the phone: strip spaces, dashes, and leading +
+  const normalize = (p: string) => p.replace(/[\s\-\+\(\)]/g, '');
+  const normalizedPhone = normalize(phone);
+
+  for (const req of mockLeaveRequests) {
+    if (req.status !== 'pending') continue;
+    const student = mockStudents.find(s => s.id === req.studentId);
+    if (student && normalize(student.guardianContact) === normalizedPhone) {
+      return { leaveRequest: req, student };
+    }
+  }
+  return null;
+};
+
+// Staff Leave management functions
+export const submitStaffLeaveRequest = (request: Omit<StaffLeaveRequest, 'id' | 'submittedAt' | 'status'>) => {
+  const newRequest: StaffLeaveRequest = {
+    ...request,
+    id: `sl-${Date.now()}`,
+    submittedAt: new Date().toISOString(),
+    status: 'pending'
+  };
+  mockStaffLeaveRequests.push(newRequest);
+  saveToStorage();
+  eventBus.emit(EVENTS.STAFF_LEAVE_UPDATED);
+  return newRequest;
+};
+
+export const approveStaffLeaveRequest = (id: string, reviewerId: string, approverComments?: string) => {
+  const idx = mockStaffLeaveRequests.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    mockStaffLeaveRequests[idx] = {
+      ...mockStaffLeaveRequests[idx],
+      status: 'approved',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: reviewerId,
+      approverComments
+    };
+    saveToStorage();
+    eventBus.emit(EVENTS.STAFF_LEAVE_UPDATED);
+    return mockStaffLeaveRequests[idx];
+  }
+  return null;
+};
+
+export const rejectStaffLeaveRequest = (id: string, reviewerId: string, approverComments?: string) => {
+  const idx = mockStaffLeaveRequests.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    mockStaffLeaveRequests[idx] = {
+      ...mockStaffLeaveRequests[idx],
+      status: 'rejected',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: reviewerId,
+      approverComments
+    };
+    saveToStorage();
+    eventBus.emit(EVENTS.STAFF_LEAVE_UPDATED);
+    return mockStaffLeaveRequests[idx];
+  }
+  return null;
+};
+
 // Export functions
 export const exportData = (type: string, format: 'pdf' | 'excel' | 'csv', filters?: any) => {
-  // This would integrate with actual export libraries
-  console.log(`Exporting ${type} data in ${format} format with filters:`, filters);
-  
-  // Simulate export process
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        filename: `${type}_export_${new Date().toISOString().split('T')[0]}.${format}`,
-        downloadUrl: '#'
-      });
-    }, 2000);
+  // Import and use the real export service
+  const { exportService } = require('../services/export');
+
+  let data: any[] = [];
+  let headers: string[] = [];
+  let title = '';
+
+  switch (type) {
+    case 'maintenance':
+      title = 'Maintenance Requests Report';
+      headers = ['Title', 'Category', 'Priority', 'Status', 'Room', 'Created', 'Completed'];
+      data = mockMaintenanceRequests.map(r => ({
+        Title: r.title,
+        Category: r.category,
+        Priority: r.priority,
+        Status: r.status,
+        Room: r.roomId ? mockRooms.find(rm => rm.id === r.roomId)?.number || '' : '',
+        Created: new Date(r.createdAt).toLocaleDateString(),
+        Completed: r.completedAt ? new Date(r.completedAt).toLocaleDateString() : '-',
+      }));
+      break;
+    case 'staff':
+      title = 'Staff Report';
+      headers = ['Name', 'Employee ID', 'Email', 'Position', 'Department', 'Shift', 'Status'];
+      data = mockStaff.filter(s => !s.deletedAt).map(s => ({
+        Name: s.name,
+        'Employee ID': s.employeeId,
+        Email: s.email,
+        Position: s.position,
+        Department: s.department,
+        Shift: s.shiftTiming,
+        Status: s.isActive ? 'Active' : 'Inactive',
+      }));
+      break;
+    case 'tasks':
+      title = 'Staff Tasks Report';
+      headers = ['Title', 'Assigned To', 'Priority', 'Status', 'Category', 'Due Date', 'Created'];
+      data = mockStaffTasks.map(t => ({
+        Title: t.title,
+        'Assigned To': mockStaff.find(s => s.id === t.assignedTo)?.name || '',
+        Priority: t.priority,
+        Status: t.status,
+        Category: t.category,
+        'Due Date': new Date(t.dueDate).toLocaleDateString(),
+        Created: new Date(t.createdAt).toLocaleDateString(),
+      }));
+      break;
+    default:
+      break;
+  }
+
+  if (data.length > 0) {
+    exportService.generateReport(title, data, format, headers);
+  }
+
+  return Promise.resolve({
+    success: true,
+    filename: `${type}_export_${new Date().toISOString().split('T')[0]}.${format}`,
   });
 };
 
@@ -691,6 +842,45 @@ if (persisted?.credentials) {
     }
   });
 }
+
+// ============================================================
+// Auto-register ALL existing students & staff so they can login
+// even on a fresh browser with no localStorage data.
+// Students: login with email / password "student123"
+// Staff:    login with email / password "staff123"
+// ============================================================
+(() => {
+  // Register every student that has no explicit credential yet
+  mockStudents.forEach(s => {
+    // Use the student's own generatedPassword if available, otherwise default
+    const pw = s.generatedPassword || 'student123';
+    registerCredentialForLogin({
+      email: s.email,
+      generatedId: s.enrollmentNumber,   // e.g. TC2024001
+      generatedPassword: pw,
+      name: s.name,
+      role: 'student',
+      userId: s.userId,
+      isActive: s.isActive,
+    });
+  });
+
+  // Register every staff member
+  mockStaff.forEach(st => {
+    const pw = st.generatedPassword || 'staff123';
+    registerCredentialForLogin({
+      email: st.email,
+      generatedId: st.employeeId,         // e.g. TC-STAFF-001
+      generatedPassword: pw,
+      name: st.name,
+      role: 'staff',
+      userId: st.userId,
+      isActive: st.isActive,
+    });
+  });
+
+  console.log(`✅ Auto-registered ${mockStudents.length} students & ${mockStaff.length} staff for login`);
+})();
 
 const generateStaffId = (): string => {
   const num = mockStaff.length + mockCredentials.filter(c => c.role === 'staff').length + 1;

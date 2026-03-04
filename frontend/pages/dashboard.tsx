@@ -22,7 +22,7 @@ export function DashboardPage() {
   // === Student computed data ===
   const studentData = useMemo(() => {
     if (userRole !== 'student' || !user?.id) return null;
-    const studentId = getLinkedStudentId(user.id);
+    const studentId = getLinkedStudentId(user.id, user.email);
     if (!studentId) return null;
     const student = mockStudents.find(s => s.id === studentId);
     if (!student) return null;
@@ -52,7 +52,7 @@ export function DashboardPage() {
   // === Staff computed data ===
   const staffData = useMemo(() => {
     if (userRole !== 'staff' || !user?.id) return null;
-    const staffId = getLinkedStaffId(user.id);
+    const staffId = getLinkedStaffId(user.id, user.email);
     if (!staffId) return null;
 
     const myTasks = mockStaffTasks.filter(t => t.assignedTo === staffId);

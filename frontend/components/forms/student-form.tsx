@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Student } from '../../types';
 import { addStudent, updateStudent } from '../../store/mock-data';
 import { toast } from 'sonner';
-import { Key, Copy, Check } from 'lucide-react';
+import { Key, Copy, Check, Camera, Upload, X, UserCircle } from 'lucide-react';
 
 interface StudentFormProps {
   student?: Student;
@@ -29,11 +29,28 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
     emergencyContact: student?.emergencyContact || '',
     medicalNotes: student?.medicalNotes || '',
     joiningDate: student?.joiningDate || new Date().toISOString().split('T')[0],
+    profileImage: student?.profileImage || '',
+    parentImage1: student?.parentImage1 || '',
+    parentImage2: student?.parentImage2 || '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCreds, setGeneratedCreds] = useState<{ id: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState('');
+  const studentImgRef = useRef<HTMLInputElement>(null);
+  const parent1ImgRef = useRef<HTMLInputElement>(null);
+  const parent2ImgRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (field: 'profileImage' | 'parentImage1' | 'parentImage2') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select a valid image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setFormData(prev => ({ ...prev, [field]: ev.target?.result as string }));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +62,9 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         userId: student?.userId || Date.now().toString(),
         year: parseInt(formData.year),
         gender: formData.gender as 'male' | 'female' | 'other',
+        profileImage: formData.profileImage || undefined,
+        parentImage1: formData.parentImage1 || undefined,
+        parentImage2: formData.parentImage2 || undefined,
       };
 
       if (student) {
@@ -131,6 +151,73 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Photo Upload Section */}
+      <div className="rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 p-4">
+        <label className="block text-sm font-semibold mb-3">Photos</label>
+        <div className="grid grid-cols-3 gap-4">
+          {/* Student Photo */}
+          <div className="text-center">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Student Photo</p>
+            {formData.profileImage ? (
+              <div className="relative inline-block">
+                <img src={formData.profileImage} alt="Student" className="w-24 h-24 rounded-lg object-cover border-2 border-gray-200 mx-auto" />
+                <button type="button" onClick={() => setFormData(prev => ({ ...prev, profileImage: '' }))} className="absolute -top-2 -right-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600 shadow-md">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input ref={studentImgRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload('profileImage')} />
+                <button type="button" onClick={() => studentImgRef.current?.click()} className="flex flex-col items-center justify-center w-24 h-24 mx-auto rounded-lg border-2 border-dashed border-gray-300 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+                  <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Upload</span>
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Parent 1 Photo */}
+          <div className="text-center">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Parent 1 Photo</p>
+            {formData.parentImage1 ? (
+              <div className="relative inline-block">
+                <img src={formData.parentImage1} alt="Parent 1" className="w-24 h-24 rounded-lg object-cover border-2 border-gray-200 mx-auto" />
+                <button type="button" onClick={() => setFormData(prev => ({ ...prev, parentImage1: '' }))} className="absolute -top-2 -right-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600 shadow-md">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input ref={parent1ImgRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload('parentImage1')} />
+                <button type="button" onClick={() => parent1ImgRef.current?.click()} className="flex flex-col items-center justify-center w-24 h-24 mx-auto rounded-lg border-2 border-dashed border-gray-300 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+                  <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Upload</span>
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Parent 2 Photo */}
+          <div className="text-center">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Parent 2 Photo</p>
+            {formData.parentImage2 ? (
+              <div className="relative inline-block">
+                <img src={formData.parentImage2} alt="Parent 2" className="w-24 h-24 rounded-lg object-cover border-2 border-gray-200 mx-auto" />
+                <button type="button" onClick={() => setFormData(prev => ({ ...prev, parentImage2: '' }))} className="absolute -top-2 -right-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600 shadow-md">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input ref={parent2ImgRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload('parentImage2')} />
+                <button type="button" onClick={() => parent2ImgRef.current?.click()} className="flex flex-col items-center justify-center w-24 h-24 mx-auto rounded-lg border-2 border-dashed border-gray-300 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+                  <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Upload</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="Full Name"

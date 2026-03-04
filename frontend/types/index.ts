@@ -29,6 +29,8 @@ export interface Student {
   roomId?: string;
   bedId?: string;
   profileImage?: string;
+  parentImage1?: string;
+  parentImage2?: string;
   joiningDate: string;
   isActive: boolean;
   currentStatus: 'present' | 'on-leave' | 'absent';
@@ -171,6 +173,25 @@ export interface LeaveRequest {
   smsNotificationSent?: boolean;
   smsDeliveryStatus?: 'pending' | 'delivered' | 'failed';
   approvalCode?: string;
+  parentCallVerified?: boolean;
+  parentCallTimestamp?: string;
+  parentCallNotes?: string;
+  parentCallBy?: string;
+}
+
+export interface StaffLeaveRequest {
+  id: string;
+  staffId: string;
+  staffName: string;
+  type: 'casual-leave' | 'sick-leave' | 'earned-leave' | 'emergency-leave' | 'other';
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  approverComments?: string;
 }
 
 export interface MaintenanceRequest {
@@ -202,11 +223,12 @@ export interface Visitor {
   checkInTime: string;
   checkOutTime?: string;
   idProofType: string;
-  idProofNumber: string;
+  idProofNumber?: string;
   vehicleNumber?: string;
   approvedBy: string;
   visitDuration?: number;
   remarks?: string;
+  photo?: string;
 }
 
 export interface Message {
@@ -294,6 +316,7 @@ export interface StaffTask {
   progressUpdates?: TaskProgress[];
   reassignedFrom?: string;
   reassignedAt?: string;
+  voiceMessage?: string;
 }
 
 export interface DailyReport {
