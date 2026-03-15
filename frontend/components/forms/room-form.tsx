@@ -16,7 +16,7 @@ export function RoomForm({ room, onSuccess, onCancel }: RoomFormProps) {
   const [formData, setFormData] = useState({
     number: room?.number || '',
     floor: room?.floor?.toString() || '1',
-    capacity: room?.capacity?.toString() || '2',
+    capacity: room?.capacity?.toString() || '3',
     type: room?.type || 'AC',
     gender: room?.gender || 'male',
     status: room?.status || 'available',
@@ -85,7 +85,13 @@ export function RoomForm({ room, onSuccess, onCancel }: RoomFormProps) {
         <Select
           label="Capacity"
           options={[
+            { value: '2', label: '2 Beds' },
             { value: '3', label: '3 Beds' },
+            { value: '4', label: '4 Beds' },
+            { value: '5', label: '5 Beds' },
+            { value: '6', label: '6 Beds' },
+            { value: '7', label: '7 Beds' },
+            { value: '8', label: '8 Beds' },
           ]}
           value={formData.capacity}
           onChange={(e) => handleChange('capacity', e.target.value)}

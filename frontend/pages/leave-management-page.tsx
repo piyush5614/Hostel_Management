@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -17,6 +17,7 @@ import {
   approveLeaveRequest,
   rejectLeaveRequest,
   recordParentCall,
+  syncLeaveRequestsFromApi,
   submitStaffLeaveRequest,
   approveStaffLeaveRequest,
   rejectStaffLeaveRequest,
@@ -60,6 +61,13 @@ export function LeaveManagementPage() {
   const isStaff = user?.role === 'staff';
   const isStudent = user?.role === 'student';
   const canManageLeave = isAdmin || isWarden;
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    void syncLeaveRequestsFromApi();
+  }, [user?.id]);
 
   // Resolve linked IDs
   const myStudentId = isStudent && user?.id ? getLinkedStudentId(user.id, user.email) : null;

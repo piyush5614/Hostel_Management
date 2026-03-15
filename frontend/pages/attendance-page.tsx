@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,6 +11,8 @@ import {
   mockRooms,
   createAttendanceSheet,
   submitAttendanceToAdmin,
+  syncAttendanceFromApi,
+  upsertAttendanceRecords,
   exportData,
   getLinkedStudentId
 } from '../store/mock-data';
@@ -33,6 +35,13 @@ export function AttendancePage() {
 
   const isStudent = user?.role === 'student';
   const canManageAttendance = user?.role === 'admin' || user?.role === 'warden' || user?.role === 'staff';
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    void syncAttendanceFromApi();
+  }, [user?.id, isStudent]);
 
   // For student: resolve their linked student record
   const myStudentId = useMemo(() => {
@@ -120,39 +129,24 @@ export function AttendancePage() {
     setIsMarkingAttendance(true);
   };
 
-  const handleSaveAttendance = () => {
+  const handleSaveAttendance = async () => {
     const students = getStudentsForAttendance();
-    
-    // Save individual attendance records
-    students.forEach(student => {
-      const data = attendanceData[student.id];
-      if (data) {
-        // Remove existing attendance for this date
-        const existingIndex = mockAttendance.findIndex(
-          a => a.studentId === student.id && a.date === selectedDate
-        );
-        
-        const attendanceRecord: Attendance = {
-          id: existingIndex >= 0 ? mockAttendance[existingIndex].id : Date.now().toString() + student.id,
-          studentId: student.id,
-          date: selectedDate,
-          morningStatus: data.morning as 'present' | 'absent' | 'leave',
-          eveningStatus: data.evening as 'present' | 'absent' | 'leave',
-          remarks: data.remarks,
-          recordedBy: user?.id || '',
-          recordedAt: new Date().toISOString()
-        };
-        
-        if (existingIndex >= 0) {
-          mockAttendance[existingIndex] = attendanceRecord;
-        } else {
-          mockAttendance.push(attendanceRecord);
-        }
-      }
-    });
+
+    const records: Omit<Attendance, 'id' | 'recordedAt'>[] = students
+      .filter((student) => Boolean(attendanceData[student.id]))
+      .map((student) => ({
+        studentId: student.id,
+        date: selectedDate,
+        morningStatus: attendanceData[student.id].morning as 'present' | 'absent' | 'leave',
+        eveningStatus: attendanceData[student.id].evening as 'present' | 'absent' | 'leave',
+        remarks: attendanceData[student.id].remarks,
+        recordedBy: user?.id || '',
+      }));
+
+    await upsertAttendanceRecords(records);
 
     // Create attendance sheet
-    const attendanceSheet = createAttendanceSheet({
+    createAttendanceSheet({
       date: selectedDate,
       roomId: selectedRoom || undefined,
       floor: selectedFloor ? parseInt(selectedFloor) : undefined,

@@ -17,6 +17,104 @@ import {
   getHistoricalAttendance
 } from './enhanced-mock-data';
 
+const DEFAULT_API_COLLEGE_ID = (import.meta.env.VITE_DEFAULT_COLLEGE_ID as string | undefined) || 'college-default';
+
+const getStoredSession = (): { access_token?: string } | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = localStorage.getItem('tc-hostel-enhanced-session');
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as { access_token?: string };
+  } catch {
+    return null;
+  }
+};
+
+const getApiToken = (): string | null => {
+  const token = getStoredSession()?.access_token;
+  if (!token || token === 'mock-access-token') {
+    return null;
+  }
+  return token;
+};
+
+const getApiCollegeId = (): string => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_API_COLLEGE_ID;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('collegeId') || params.get('college');
+    if (fromUrl?.trim()) {
+      return fromUrl.trim();
+    }
+
+    const fromStorage = localStorage.getItem('tc-hostel-active-college-id');
+    if (fromStorage?.trim()) {
+      return fromStorage.trim();
+    }
+  } catch {
+    // Ignore URL/localStorage parsing errors.
+  }
+
+  return DEFAULT_API_COLLEGE_ID;
+};
+
+const getApiHeaders = (withJson = true): HeadersInit => {
+  const headers: Record<string, string> = {
+    'x-college-id': getApiCollegeId(),
+  };
+
+  if (withJson) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const token = getApiToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+};
+
+const parseApiResponse = async <T>(response: Response): Promise<T> => {
+  const raw = await response.text();
+  if (!raw) {
+    return null as T;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return raw as T;
+  }
+};
+
+const apiRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    headers: {
+      ...getApiHeaders(init.body !== undefined),
+      ...(init.headers || {}),
+    },
+  });
+
+  const payload = await parseApiResponse<any>(response);
+
+  if (!response.ok) {
+    const message = payload?.error || payload?.message || `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return payload as T;
+};
+
 // ============================================================
 // LocalStorage Persistence Layer
 // ============================================================
@@ -115,68 +213,39 @@ export let mockStaff: Staff[] = persisted?.staff ?? getAllEnhancedStaff();
 const generateRooms = (): Room[] => {
   const rooms: Room[] = [];
   let roomId = 1;
-  
-  // Floor 1: 34 rooms (101-134)
-  for (let i = 1; i <= 34; i++) {
-    const roomNumber = `1${i.toString().padStart(2, '0')}`;
-    rooms.push({
-      id: roomId.toString(),
-      number: roomNumber,
-      floor: 1,
-      capacity: 3,
-      type: i <= 17 ? 'AC' : 'Non-AC',
-      gender: i <= 17 ? 'male' : 'female',
-      status: 'available',
-      occupiedBeds: 0,
-      totalBeds: 3,
-      amenities: ['WiFi', 'Study Table', 'Wardrobe', 'Fan'],
-      lastCleaned: new Date().toISOString()
-    });
-    roomId++;
-  }
-  
-  // Floor 2: 34 rooms (201-234)
-  for (let i = 1; i <= 34; i++) {
-    const roomNumber = `2${i.toString().padStart(2, '0')}`;
-    rooms.push({
-      id: roomId.toString(),
-      number: roomNumber,
-      floor: 2,
-      capacity: 3,
-      type: i <= 17 ? 'AC' : 'Non-AC',
-      gender: i <= 17 ? 'male' : 'female',
-      status: 'available',
-      occupiedBeds: 0,
-      totalBeds: 3,
-      amenities: ['WiFi', 'Study Table', 'Wardrobe', 'Fan'],
-      lastCleaned: new Date().toISOString()
-    });
-    roomId++;
-  }
-  
-  // Floor 3: 38 rooms (301-338)
-  for (let i = 1; i <= 38; i++) {
-    const roomNumber = `3${i.toString().padStart(2, '0')}`;
-    rooms.push({
-      id: roomId.toString(),
-      number: roomNumber,
-      floor: 3,
-      capacity: 3,
-      type: i <= 19 ? 'AC' : 'Non-AC',
-      gender: i <= 19 ? 'male' : 'female',
-      status: 'available',
-      occupiedBeds: 0,
-      totalBeds: 3,
-      amenities: ['WiFi', 'Study Table', 'Wardrobe', 'Fan'],
-      lastCleaned: new Date().toISOString()
-    });
-    roomId++;
-  }
+
+  const floorConfigs = [
+    { floor: 1, roomCount: 35 },
+    { floor: 2, roomCount: 35 },
+    { floor: 3, roomCount: 36 },
+  ];
+
+  floorConfigs.forEach(({ floor, roomCount }) => {
+    const acCount = Math.floor(roomCount / 2);
+
+    for (let i = 1; i <= roomCount; i++) {
+      const roomNumber = `${floor}${i.toString().padStart(2, '0')}`;
+      rooms.push({
+        id: roomId.toString(),
+        number: roomNumber,
+        floor,
+        capacity: 3,
+        type: i <= acCount ? 'AC' : 'Non-AC',
+        gender: i <= acCount ? 'male' : 'female',
+        status: 'available',
+        occupiedBeds: 0,
+        totalBeds: 3,
+        amenities: ['WiFi', 'Study Table', 'Wardrobe', 'Fan'],
+        lastCleaned: new Date().toISOString()
+      });
+      roomId++;
+    }
+  });
   
   return rooms;
 };
 
-export const mockRooms: Room[] = persisted?.rooms ?? generateRooms();
+export let mockRooms: Room[] = persisted?.rooms ?? generateRooms();
 
 // Generate beds for all rooms (or load from storage)
 export let mockBeds: Bed[] = persisted?.beds ?? [];
@@ -422,6 +491,77 @@ export const updateUser = (id: string, updates: any) => {
   return { success: true };
 };
 
+const mapStudentFromApi = (row: any): Student => {
+  const existing = mockStudents.find(
+    (student) =>
+      student.id === row.id ||
+      student.userId === (row.user_id ?? row.userId) ||
+      (student.email && row.email && student.email.toLowerCase() === String(row.email).toLowerCase())
+  );
+
+  return {
+    id: row.id,
+    userId: row.user_id ?? row.userId,
+    name: row.name || existing?.name || '',
+    email: row.email || existing?.email || '',
+    enrollmentNumber: row.enrollment_number ?? row.enrollmentNumber ?? existing?.enrollmentNumber ?? '',
+    course: row.course || existing?.course || '',
+    year: Number(row.year ?? existing?.year ?? 1),
+    gender: (row.gender || existing?.gender || 'male') as Student['gender'],
+    dateOfBirth: row.date_of_birth ?? row.dateOfBirth ?? existing?.dateOfBirth ?? '',
+    contactNumber: row.contact_number ?? row.contactNumber ?? existing?.contactNumber ?? '',
+    address: row.address ?? existing?.address ?? '',
+    guardianName: row.guardian_name ?? row.guardianName ?? existing?.guardianName ?? '',
+    guardianContact: row.guardian_contact ?? row.guardianContact ?? existing?.guardianContact ?? '',
+    emergencyContact: row.emergency_contact ?? row.emergencyContact ?? existing?.emergencyContact ?? '',
+    medicalNotes: row.medical_notes ?? row.medicalNotes ?? existing?.medicalNotes,
+    roomId: row.room_id ?? row.roomId ?? existing?.roomId,
+    bedId: row.bed_id ?? row.bedId ?? existing?.bedId,
+    profileImage: row.profile_image ?? row.profileImage ?? existing?.profileImage,
+    parentImage1: row.parent_image_1 ?? row.parentImage1 ?? existing?.parentImage1,
+    parentImage2: row.parent_image_2 ?? row.parentImage2 ?? existing?.parentImage2,
+    joiningDate: row.joining_date ?? row.joiningDate ?? existing?.joiningDate ?? new Date().toISOString(),
+    isActive: row.is_active === undefined ? (existing?.isActive ?? true) : Boolean(row.is_active),
+    currentStatus: (row.current_status ?? row.currentStatus ?? existing?.currentStatus ?? 'present') as Student['currentStatus'],
+    generatedPassword: existing?.generatedPassword,
+  };
+};
+
+const upsertStudentFromApi = (row: any): Student => {
+  const mapped = mapStudentFromApi(row);
+  const index = mockStudents.findIndex(
+    (student) => student.id === mapped.id || student.userId === mapped.userId || student.email?.toLowerCase() === mapped.email?.toLowerCase()
+  );
+
+  if (index >= 0) {
+    mockStudents[index] = { ...mockStudents[index], ...mapped };
+  } else {
+    mockStudents.unshift(mapped);
+  }
+
+  return mapped;
+};
+
+export const syncStudentsFromApi = async (): Promise<Student[]> => {
+  if (!getApiToken()) {
+    return mockStudents;
+  }
+
+  try {
+    const rows = await apiRequest<any[]>('/students', { method: 'GET' });
+    if (Array.isArray(rows)) {
+      mockStudents = rows.map(mapStudentFromApi);
+      saveToStorage();
+      eventBus.emit(EVENTS.STUDENT_UPDATED);
+      eventBus.emit(EVENTS.ROOM_UPDATED);
+    }
+  } catch (error) {
+    console.warn('Failed to sync students from API, using local cache:', error);
+  }
+
+  return mockStudents;
+};
+
 export const addStudent = (student: Omit<Student, 'id'>): Student => {
   const credential = generateCredentials(student.name, student.email, 'student');
   const newStudent: Student = {
@@ -437,6 +577,52 @@ export const addStudent = (student: Omit<Student, 'id'>): Student => {
   addActivityLog('system', 'System', 'created', 'student', newStudent.id, `Student ${newStudent.name} added`);
   saveToStorage();
   eventBus.emit(EVENTS.STUDENT_UPDATED);
+
+  void apiRequest<any>('/students', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: student.name,
+      email: student.email,
+      password: credential.generatedPassword,
+      generatedId: credential.generatedId,
+      enrollmentNumber: newStudent.enrollmentNumber,
+      course: student.course,
+      year: student.year,
+      gender: student.gender,
+      dateOfBirth: student.dateOfBirth,
+      contactNumber: student.contactNumber,
+      address: student.address,
+      guardianName: student.guardianName,
+      guardianContact: student.guardianContact,
+      emergencyContact: student.emergencyContact,
+      medicalNotes: student.medicalNotes,
+      joiningDate: student.joiningDate,
+      profileImage: student.profileImage,
+      parentImage1: student.parentImage1,
+      parentImage2: student.parentImage2,
+      currentStatus: newStudent.currentStatus,
+      isActive: true,
+    }),
+  })
+    .then((row) => {
+      const created = upsertStudentFromApi(row);
+      credential.userId = created.userId;
+      registerCredentialForLogin({
+        email: credential.email,
+        generatedId: credential.generatedId,
+        generatedPassword: credential.generatedPassword,
+        name: credential.name,
+        role: credential.role,
+        userId: created.userId,
+        isActive: credential.isActive,
+      });
+      saveToStorage();
+      eventBus.emit(EVENTS.STUDENT_UPDATED);
+    })
+    .catch((error) => {
+      console.warn('Failed to persist student to API, kept local copy:', error);
+    });
+
   return newStudent;
 };
 
@@ -446,6 +632,27 @@ export const updateStudent = (id: string, updates: Partial<Student>) => {
     mockStudents[studentIndex] = { ...mockStudents[studentIndex], ...updates };
     saveToStorage();
     eventBus.emit(EVENTS.STUDENT_UPDATED);
+
+    if (updates.roomId !== undefined || updates.bedId !== undefined) {
+      eventBus.emit(EVENTS.ROOM_UPDATED);
+    }
+
+    void apiRequest<any>(`/students/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+      .then((row) => {
+        upsertStudentFromApi(row);
+        saveToStorage();
+        eventBus.emit(EVENTS.STUDENT_UPDATED);
+        if (updates.roomId !== undefined || updates.bedId !== undefined) {
+          eventBus.emit(EVENTS.ROOM_UPDATED);
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to persist student update to API, kept local state:', error);
+      });
+
     return mockStudents[studentIndex];
   }
   return null;
@@ -469,9 +676,82 @@ export const deleteStudent = (id: string) => {
     mockStudents.splice(studentIndex, 1);
     saveToStorage();
     eventBus.emit(EVENTS.STUDENT_UPDATED);
+    eventBus.emit(EVENTS.ROOM_UPDATED);
+
+    void apiRequest<{ success: boolean }>(`/students/${id}`, {
+      method: 'DELETE',
+    }).catch((error) => {
+      console.warn('Failed to delete student in API, local state was already updated:', error);
+    });
+
     return true;
   }
   return false;
+};
+
+const mapBedFromApi = (row: any): Bed => ({
+  id: row.id,
+  roomId: row.roomId ?? row.room_id,
+  number: Number(row.number ?? 0),
+  status: (row.status || 'available') as Bed['status'],
+  studentId: row.studentId ?? row.student_id,
+  assignedDate: row.assignedDate ?? row.assigned_date,
+});
+
+const mapRoomFromApi = (row: any): Room => {
+  const existing = mockRooms.find((room) => room.id === row.id || room.number === row.number);
+  return {
+    id: row.id,
+    number: row.number,
+    floor: Number(row.floor ?? existing?.floor ?? 1),
+    capacity: Number(row.capacity ?? row.totalBeds ?? row.total_beds ?? existing?.capacity ?? 0),
+    type: (row.type || existing?.type || 'AC') as Room['type'],
+    gender: (row.gender || existing?.gender || 'male') as Room['gender'],
+    status: (row.status || existing?.status || 'available') as Room['status'],
+    occupiedBeds: Number(row.occupiedBeds ?? row.occupied_beds ?? existing?.occupiedBeds ?? 0),
+    totalBeds: Number(row.totalBeds ?? row.total_beds ?? row.capacity ?? existing?.totalBeds ?? 0),
+    amenities: Array.isArray(row.amenities) ? row.amenities : existing?.amenities || [],
+    lastCleaned: row.lastCleaned ?? row.last_cleaned ?? existing?.lastCleaned,
+  };
+};
+
+const upsertRoomFromApi = (row: any): Room => {
+  const mapped = mapRoomFromApi(row);
+  const roomIndex = mockRooms.findIndex((room) => room.id === mapped.id || room.number === mapped.number);
+
+  if (roomIndex >= 0) {
+    mockRooms[roomIndex] = { ...mockRooms[roomIndex], ...mapped };
+  } else {
+    mockRooms.push(mapped);
+  }
+
+  if (Array.isArray(row.beds)) {
+    const beds = row.beds.map(mapBedFromApi);
+    mockBeds = mockBeds.filter((bed) => bed.roomId !== mapped.id);
+    mockBeds.push(...beds);
+  }
+
+  return mapped;
+};
+
+export const syncRoomsFromApi = async (): Promise<Room[]> => {
+  if (!getApiToken()) {
+    return mockRooms;
+  }
+
+  try {
+    const rows = await apiRequest<any[]>('/rooms', { method: 'GET' });
+    if (Array.isArray(rows)) {
+      mockRooms = rows.map(mapRoomFromApi);
+      mockBeds = rows.flatMap((row) => Array.isArray(row.beds) ? row.beds.map(mapBedFromApi) : []);
+      saveToStorage();
+      eventBus.emit(EVENTS.ROOM_UPDATED);
+    }
+  } catch (error) {
+    console.warn('Failed to sync rooms from API, using local cache:', error);
+  }
+
+  return mockRooms;
 };
 
 export const addRoom = (room: Omit<Room, 'id'>) => {
@@ -498,6 +778,27 @@ export const addRoom = (room: Omit<Room, 'id'>) => {
   
   saveToStorage();
   eventBus.emit(EVENTS.ROOM_UPDATED);
+
+  void apiRequest<any>('/rooms', {
+    method: 'POST',
+    body: JSON.stringify({
+      number: room.number,
+      floor: room.floor,
+      capacity: room.capacity,
+      type: room.type,
+      gender: room.gender,
+      amenities: newRoom.amenities,
+    }),
+  })
+    .then((row) => {
+      upsertRoomFromApi(row);
+      saveToStorage();
+      eventBus.emit(EVENTS.ROOM_UPDATED);
+    })
+    .catch((error) => {
+      console.warn('Failed to persist room to API, kept local copy:', error);
+    });
+
   return newRoom;
 };
 
@@ -507,6 +808,20 @@ export const updateRoom = (id: string, updates: Partial<Room>) => {
     mockRooms[roomIndex] = { ...mockRooms[roomIndex], ...updates };
     saveToStorage();
     eventBus.emit(EVENTS.ROOM_UPDATED);
+
+    void apiRequest<any>(`/rooms/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+      .then((row) => {
+        upsertRoomFromApi(row);
+        saveToStorage();
+        eventBus.emit(EVENTS.ROOM_UPDATED);
+      })
+      .catch((error) => {
+        console.warn('Failed to persist room update to API, kept local state:', error);
+      });
+
     return mockRooms[roomIndex];
   }
   return null;
@@ -517,6 +832,21 @@ export const updateBed = (id: string, updates: Partial<Bed>) => {
   if (bedIndex !== -1) {
     mockBeds[bedIndex] = { ...mockBeds[bedIndex], ...updates };
     saveToStorage();
+    eventBus.emit(EVENTS.ROOM_UPDATED);
+
+    void apiRequest<any>(`/rooms/beds/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+      .then((row) => {
+        mockBeds[bedIndex] = { ...mockBeds[bedIndex], ...mapBedFromApi(row) };
+        saveToStorage();
+        eventBus.emit(EVENTS.ROOM_UPDATED);
+      })
+      .catch((error) => {
+        console.warn('Failed to persist bed update to API, kept local state:', error);
+      });
+
     return mockBeds[bedIndex];
   }
   return null;
@@ -538,12 +868,72 @@ export const deleteRoom = (id: string) => {
     // Remove the room
     mockRooms.splice(roomIndex, 1);
     saveToStorage();
+
+    void apiRequest<{ success: boolean; message?: string }>(`/rooms/${id}`, {
+      method: 'DELETE',
+    }).catch((error) => {
+      console.warn('Failed to delete room in API, local state was already updated:', error);
+    });
+
+    eventBus.emit(EVENTS.ROOM_UPDATED);
     return { success: true, message: 'Room deleted successfully' };
   }
   return { success: false, message: 'Room not found' };
 };
 
 // Leave management functions
+const mapLeaveRequestFromApi = (row: any): LeaveRequest => ({
+  id: row.id,
+  studentId: row.student_id ?? row.studentId,
+  type: row.type,
+  startDate: row.start_date ?? row.startDate,
+  endDate: row.end_date ?? row.endDate,
+  reason: row.reason || '',
+  status: row.status || 'pending',
+  submittedAt: row.submitted_at ?? row.submittedAt ?? new Date().toISOString(),
+  reviewedAt: row.reviewed_at ?? row.reviewedAt,
+  reviewedBy: row.reviewed_by ?? row.reviewedBy,
+  approverComments: row.approver_comments ?? row.approverComments,
+  emergencyContact: row.emergency_contact ?? row.emergencyContact,
+  checkOutTime: row.check_out_time ?? row.checkOutTime,
+  checkInTime: row.check_in_time ?? row.checkInTime,
+  actualReturnDate: row.actual_return_date ?? row.actualReturnDate,
+  parentApprovalStatus: row.parent_approval_status ?? row.parentApprovalStatus,
+  parentCallVerified: Boolean(row.parent_call_verified ?? row.parentCallVerified),
+  parentCallTimestamp: row.parent_call_timestamp ?? row.parentCallTimestamp,
+  parentCallNotes: row.parent_call_notes ?? row.parentCallNotes,
+  parentCallBy: row.parent_call_by ?? row.parentCallBy,
+});
+
+const upsertLeaveRequest = (request: LeaveRequest): LeaveRequest => {
+  const idx = mockLeaveRequests.findIndex((r) => r.id === request.id);
+  if (idx >= 0) {
+    mockLeaveRequests[idx] = { ...mockLeaveRequests[idx], ...request };
+  } else {
+    mockLeaveRequests.unshift(request);
+  }
+  return request;
+};
+
+export const syncLeaveRequestsFromApi = async (): Promise<LeaveRequest[]> => {
+  if (!getApiToken()) {
+    return mockLeaveRequests;
+  }
+
+  try {
+    const rows = await apiRequest<any[]>('/leave', { method: 'GET' });
+    if (Array.isArray(rows)) {
+      mockLeaveRequests = rows.map(mapLeaveRequestFromApi);
+      saveToStorage();
+      eventBus.emit(EVENTS.LEAVE_UPDATED);
+    }
+  } catch (error) {
+    console.warn('Failed to sync leave requests from API, using local cache:', error);
+  }
+
+  return mockLeaveRequests;
+};
+
 export const submitLeaveRequest = (request: Omit<LeaveRequest, 'id' | 'submittedAt' | 'status'>) => {
   const newRequest: LeaveRequest = {
     ...request,
@@ -551,9 +941,37 @@ export const submitLeaveRequest = (request: Omit<LeaveRequest, 'id' | 'submitted
     submittedAt: new Date().toISOString(),
     status: 'pending'
   };
-  mockLeaveRequests.push(newRequest);
+
+  upsertLeaveRequest(newRequest);
   saveToStorage();
   eventBus.emit(EVENTS.LEAVE_UPDATED);
+
+  void apiRequest<any>('/leave', {
+    method: 'POST',
+    body: JSON.stringify({
+      studentId: request.studentId,
+      type: request.type,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      reason: request.reason,
+      emergencyContact: request.emergencyContact,
+    }),
+  })
+    .then((row) => {
+      const mapped = mapLeaveRequestFromApi(row);
+      const optimisticIndex = mockLeaveRequests.findIndex((r) => r.id === newRequest.id);
+      if (optimisticIndex >= 0) {
+        mockLeaveRequests[optimisticIndex] = mapped;
+      } else {
+        upsertLeaveRequest(mapped);
+      }
+      saveToStorage();
+      eventBus.emit(EVENTS.LEAVE_UPDATED);
+    })
+    .catch((error) => {
+      console.warn('Failed to persist leave request to API, kept local copy:', error);
+    });
+
   return newRequest;
 };
 
@@ -575,6 +993,20 @@ export const approveLeaveRequest = (id: string, approverComments?: string) => {
     
     saveToStorage();
     eventBus.emit(EVENTS.LEAVE_UPDATED);
+
+    void apiRequest<any>(`/leave/${id}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ approverComments }),
+    })
+      .then((row) => {
+        upsertLeaveRequest(mapLeaveRequestFromApi(row));
+        saveToStorage();
+        eventBus.emit(EVENTS.LEAVE_UPDATED);
+      })
+      .catch((error) => {
+        console.warn('Failed to approve leave request in API, kept local state:', error);
+      });
+
     return mockLeaveRequests[requestIndex];
   }
   return null;
@@ -591,6 +1023,20 @@ export const rejectLeaveRequest = (id: string, approverComments?: string) => {
     };
     saveToStorage();
     eventBus.emit(EVENTS.LEAVE_UPDATED);
+
+    void apiRequest<any>(`/leave/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ approverComments }),
+    })
+      .then((row) => {
+        upsertLeaveRequest(mapLeaveRequestFromApi(row));
+        saveToStorage();
+        eventBus.emit(EVENTS.LEAVE_UPDATED);
+      })
+      .catch((error) => {
+        console.warn('Failed to reject leave request in API, kept local state:', error);
+      });
+
     return mockLeaveRequests[requestIndex];
   }
   return null;
@@ -609,6 +1055,20 @@ export const recordParentCall = (leaveRequestId: string, calledBy: string, notes
     };
     saveToStorage();
     eventBus.emit(EVENTS.LEAVE_UPDATED);
+
+    void apiRequest<any>(`/leave/${leaveRequestId}/verify-call`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes }),
+    })
+      .then((row) => {
+        upsertLeaveRequest(mapLeaveRequestFromApi(row));
+        saveToStorage();
+        eventBus.emit(EVENTS.LEAVE_UPDATED);
+      })
+      .catch((error) => {
+        console.warn('Failed to save parent-call verification in API, kept local state:', error);
+      });
+
     return mockLeaveRequests[requestIndex];
   }
   return null;
@@ -798,6 +1258,96 @@ export const submitDailyReport = (report: Omit<DailyReport, 'id' | 'submittedAt'
   return newReport;
 };
 
+const mapAttendanceFromApi = (row: any): Attendance => ({
+  id: row.id,
+  studentId: row.student_id ?? row.studentId,
+  date: row.date,
+  morningStatus: (row.morning_status ?? row.morningStatus ?? 'present') as Attendance['morningStatus'],
+  eveningStatus: (row.evening_status ?? row.eveningStatus ?? 'present') as Attendance['eveningStatus'],
+  remarks: row.remarks,
+  recordedBy: row.recorded_by ?? row.recordedBy ?? '',
+  recordedAt: row.recorded_at ?? row.recordedAt ?? new Date().toISOString(),
+});
+
+const upsertAttendanceRecord = (record: Attendance): Attendance => {
+  const idx = mockAttendance.findIndex(
+    (a) => a.studentId === record.studentId && a.date === record.date
+  );
+
+  if (idx >= 0) {
+    mockAttendance[idx] = { ...mockAttendance[idx], ...record };
+  } else {
+    mockAttendance.push(record);
+  }
+
+  return record;
+};
+
+export const syncAttendanceFromApi = async (filters?: {
+  date?: string;
+  studentId?: string;
+  roomId?: string;
+}): Promise<Attendance[]> => {
+  if (!getApiToken()) {
+    return mockAttendance;
+  }
+
+  try {
+    const params = new URLSearchParams();
+    if (filters?.date) params.set('date', filters.date);
+    if (filters?.studentId) params.set('studentId', filters.studentId);
+    if (filters?.roomId) params.set('roomId', filters.roomId);
+
+    const query = params.toString();
+    const rows = await apiRequest<any[]>(`/attendance${query ? `?${query}` : ''}`, { method: 'GET' });
+
+    if (Array.isArray(rows)) {
+      const mapped = rows.map(mapAttendanceFromApi);
+
+      if (!filters?.date && !filters?.studentId && !filters?.roomId) {
+        mockAttendance = mapped;
+      } else {
+        const incomingKeys = new Set(mapped.map((r) => `${r.studentId}:${r.date}`));
+        mockAttendance = mockAttendance.filter((existing) => !incomingKeys.has(`${existing.studentId}:${existing.date}`));
+        mockAttendance.push(...mapped);
+      }
+
+      saveToStorage();
+      eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
+    }
+  } catch (error) {
+    console.warn('Failed to sync attendance from API, using local cache:', error);
+  }
+
+  return mockAttendance;
+};
+
+export const upsertAttendanceRecords = async (records: Omit<Attendance, 'id' | 'recordedAt'>[]): Promise<void> => {
+  if (records.length === 0) {
+    return;
+  }
+
+  records.forEach((record) => {
+    upsertAttendanceRecord({
+      id: `${Date.now()}-${record.studentId}`,
+      ...record,
+      recordedAt: new Date().toISOString(),
+    });
+  });
+
+  saveToStorage();
+  eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
+
+  void apiRequest<{ success: boolean; count: number }>('/attendance/bulk-upsert', {
+    method: 'POST',
+    body: JSON.stringify({ records }),
+  })
+    .then(() => syncAttendanceFromApi(records[0]?.date ? { date: records[0].date } : undefined))
+    .catch((error) => {
+      console.warn('Failed to persist attendance in API, kept local state:', error);
+    });
+};
+
 // Attendance sheet management
 export const createAttendanceSheet = (sheet: Omit<AttendanceSheet, 'id' | 'submittedAt'>) => {
   const newSheet: AttendanceSheet = {
@@ -807,6 +1357,7 @@ export const createAttendanceSheet = (sheet: Omit<AttendanceSheet, 'id' | 'submi
   };
   mockAttendanceSheets.push(newSheet);
   saveToStorage();
+  eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
   return newSheet;
 };
 
@@ -815,6 +1366,7 @@ export const submitAttendanceToAdmin = (sheetId: string) => {
   if (sheetIndex !== -1) {
     mockAttendanceSheets[sheetIndex].submittedToAdmin = true;
     saveToStorage();
+    eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
     return mockAttendanceSheets[sheetIndex];
   }
   return null;

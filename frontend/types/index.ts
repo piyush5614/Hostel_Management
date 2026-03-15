@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  collegeId?: string;
   profileImage?: string;
   isActive: boolean;
   lastLogin?: string;

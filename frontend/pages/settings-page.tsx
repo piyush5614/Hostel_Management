@@ -6,11 +6,12 @@ import { Select } from '../components/ui/select';
 import { useAuthStore } from '../store/auth-store';
 import { mockUserSettings } from '../store/mock-data';
 import { UserSettings } from '../types';
-import { Settings, Bell, Shield, Globe, Palette, MessageSquare, Save } from 'lucide-react';
+import { Bell, Shield, Palette, MessageSquare, Save, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SettingsPage() {
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   
   // Find or create user settings
   const existingSettings = mockUserSettings.find(s => s.userId === user?.id);
@@ -93,6 +94,15 @@ export function SettingsPage() {
       ...prev,
       communication: { ...prev.communication, [key]: value }
     }));
+  };
+
+  const handleLogout = async () => {
+    if (!window.confirm('Are you sure you want to logout?')) {
+      return;
+    }
+
+    await logout();
+    toast.success('Logged out successfully');
   };
 
   return (
@@ -378,6 +388,18 @@ export function SettingsPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Account Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button variant="destructive" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
           </CardContent>
         </Card>
       </div>

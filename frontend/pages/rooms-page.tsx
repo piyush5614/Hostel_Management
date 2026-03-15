@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
@@ -8,12 +8,17 @@ import { RoomForm } from '../components/forms/room-form';
 import { RoomAllocationForm } from '../components/forms/room-allocation-form';
 import { AutoAssignModal } from '../components/forms/auto-assign-modal';
 import { Building2, CheckCircle2, Circle, Search, SquareAsterisk, Plus, Edit, Trash2, Users, Zap } from 'lucide-react';
-import { mockRooms, mockBeds, mockStudents, deleteRoom, autoAssignStudents } from '../store/mock-data';
+import { mockRooms, mockBeds, mockStudents, deleteRoom, autoAssignStudents, syncRoomsFromApi, syncStudentsFromApi } from '../store/mock-data';
 import { Room, Bed, Student, AutoAssignCriteria } from '../types';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { useAuthStore } from '../store/auth-store';
+import { useDataRefresh } from '../utils/use-data-refresh';
+import { EVENTS } from '../utils/event-bus';
 
 export function RoomsPage() {
+  const user = useAuthStore((state) => state.user);
+  const refreshKey = useDataRefresh([EVENTS.ROOM_UPDATED, EVENTS.STUDENT_UPDATED]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>(mockRooms);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +34,44 @@ export function RoomsPage() {
     gender: '',
     status: '',
   });
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    void Promise.all([syncRoomsFromApi(), syncStudentsFromApi()]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    let result = [...mockRooms];
+
+    if (filter.floor) {
+      result = result.filter((room) => room.floor.toString() === filter.floor);
+    }
+
+    if (filter.type) {
+      result = result.filter((room) => room.type === filter.type);
+    }
+
+    if (filter.gender) {
+      result = result.filter((room) => room.gender === filter.gender);
+    }
+
+    if (filter.status) {
+      result = result.filter((room) => room.status === filter.status);
+    }
+
+    if (searchQuery) {
+      result = result.filter((room) => room.number.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    setFilteredRooms(result);
+
+    if (selectedRoom) {
+      const updatedRoom = mockRooms.find((room) => room.id === selectedRoom.id);
+      setSelectedRoom(updatedRoom || null);
+    }
+  }, [searchQuery, filter, refreshKey, selectedRoom?.id]);
 
   // Get beds for the selected room
   const roomBeds = selectedRoom
@@ -46,68 +89,12 @@ export function RoomsPage() {
 
   // Handle filter changes
   const handleFilterChange = (key: string, value: string) => {
-    const newFilter = { ...filter, [key]: value };
-    setFilter(newFilter);
-
-    // Apply filters
-    let result = [...mockRooms];
-
-    if (newFilter.floor) {
-      result = result.filter((room) => room.floor.toString() === newFilter.floor);
-    }
-
-    if (newFilter.type) {
-      result = result.filter((room) => room.type === newFilter.type);
-    }
-
-    if (newFilter.gender) {
-      result = result.filter((room) => room.gender === newFilter.gender);
-    }
-
-    if (newFilter.status) {
-      result = result.filter((room) => room.status === newFilter.status);
-    }
-
-    if (searchQuery) {
-      result = result.filter((room) =>
-        room.number.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredRooms(result);
+    setFilter((prev) => ({ ...prev, [key]: value }));
   };
 
   // Handle search
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    
-    let result = [...mockRooms];
-    
-    // Apply existing filters
-    if (filter.floor) {
-      result = result.filter((room) => room.floor.toString() === filter.floor);
-    }
-    
-    if (filter.type) {
-      result = result.filter((room) => room.type === filter.type);
-    }
-    
-    if (filter.gender) {
-      result = result.filter((room) => room.gender === filter.gender);
-    }
-    
-    if (filter.status) {
-      result = result.filter((room) => room.status === filter.status);
-    }
-    
-    // Apply search query
-    if (query) {
-      result = result.filter((room) =>
-        room.number.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-    
-    setFilteredRooms(result);
   };
 
   // Reset filters
@@ -119,7 +106,6 @@ export function RoomsPage() {
       status: '',
     });
     setSearchQuery('');
-    setFilteredRooms(mockRooms);
   };
 
   const handleAddRoom = () => {
@@ -136,7 +122,6 @@ export function RoomsPage() {
       const result = deleteRoom(room.id);
       if (result.success) {
         toast.success(result.message);
-        setFilteredRooms(mockRooms);
         if (selectedRoom?.id === room.id) {
           setSelectedRoom(null);
         }
@@ -159,7 +144,6 @@ export function RoomsPage() {
     const result = autoAssignStudents(criteria);
     if (result.success) {
       toast.success(result.message);
-      setFilteredRooms([...mockRooms]);
       if (selectedRoom) {
         const updatedRoom = mockRooms.find(r => r.id === selectedRoom.id);
         setSelectedRoom(updatedRoom || null);
@@ -176,7 +160,6 @@ export function RoomsPage() {
     setIsAllocationModalOpen(false);
     setEditingRoom(null);
     setAllocatingRoom(null);
-    setFilteredRooms([...mockRooms]);
     // Refresh the selected room if it was edited
     if (selectedRoom && editingRoom?.id === selectedRoom.id) {
       const updatedRoom = mockRooms.find(r => r.id === selectedRoom.id);

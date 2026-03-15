@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
@@ -6,14 +6,17 @@ import { Button } from '../../components/ui/button';
 import { Modal } from '../../components/ui/modal';
 import { StudentForm } from '../../components/forms/student-form';
 import { Users, Search, Plus, Edit, Trash2, UserCircle } from 'lucide-react';
-import { mockStudents, deleteStudent } from '../../store/mock-data';
+import { mockStudents, deleteStudent, syncStudentsFromApi } from '../../store/mock-data';
 import { Student } from '../../types';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/auth-store';
+import { useDataRefresh } from '../../utils/use-data-refresh';
+import { EVENTS } from '../../utils/event-bus';
 
 export function StudentsPage() {
   const user = useAuthStore((state) => state.user);
+  const refreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED, EVENTS.ROOM_UPDATED]);
   const canEdit = user?.role === 'admin' || user?.role === 'warden';
   const [filteredStudents, setFilteredStudents] = useState<Student[]>(mockStudents);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -27,26 +30,28 @@ export function StudentsPage() {
     gender: '',
   });
 
-  // Handle filter changes
-  const handleFilterChange = (key: string, value: string) => {
-    const newFilter = { ...filter, [key]: value };
-    setFilter(newFilter);
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    void syncStudentsFromApi();
+  }, [user?.id]);
 
-    // Apply filters
+  useEffect(() => {
     let result = [...mockStudents];
 
-    if (newFilter.course) {
-      result = result.filter((student) => 
-        student.course.toLowerCase().includes(newFilter.course.toLowerCase())
+    if (filter.course) {
+      result = result.filter((student) =>
+        student.course.toLowerCase().includes(filter.course.toLowerCase())
       );
     }
 
-    if (newFilter.year) {
-      result = result.filter((student) => student.year.toString() === newFilter.year);
+    if (filter.year) {
+      result = result.filter((student) => student.year.toString() === filter.year);
     }
 
-    if (newFilter.gender) {
-      result = result.filter((student) => student.gender === newFilter.gender);
+    if (filter.gender) {
+      result = result.filter((student) => student.gender === filter.gender);
     }
 
     if (searchQuery) {
@@ -58,39 +63,21 @@ export function StudentsPage() {
     }
 
     setFilteredStudents(result);
+
+    if (selectedStudent) {
+      const updatedStudent = mockStudents.find((student) => student.id === selectedStudent.id);
+      setSelectedStudent(updatedStudent || null);
+    }
+  }, [searchQuery, filter, refreshKey, selectedStudent?.id]);
+
+  // Handle filter changes
+  const handleFilterChange = (key: string, value: string) => {
+    setFilter((prev) => ({ ...prev, [key]: value }));
   };
 
   // Handle search
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    
-    let result = [...mockStudents];
-    
-    // Apply existing filters
-    if (filter.course) {
-      result = result.filter((student) => 
-        student.course.toLowerCase().includes(filter.course.toLowerCase())
-      );
-    }
-    
-    if (filter.year) {
-      result = result.filter((student) => student.year.toString() === filter.year);
-    }
-    
-    if (filter.gender) {
-      result = result.filter((student) => student.gender === filter.gender);
-    }
-    
-    // Apply search query
-    if (query) {
-      result = result.filter((student) =>
-        student.name.toLowerCase().includes(query.toLowerCase()) ||
-        student.enrollmentNumber.toLowerCase().includes(query.toLowerCase()) ||
-        student.email.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-    
-    setFilteredStudents(result);
   };
 
   // Reset filters
@@ -101,7 +88,6 @@ export function StudentsPage() {
       gender: '',
     });
     setSearchQuery('');
-    setFilteredStudents(mockStudents);
   };
 
   const handleAddStudent = () => {
@@ -117,7 +103,6 @@ export function StudentsPage() {
     if (window.confirm(`Are you sure you want to delete ${student.name}?`)) {
       if (deleteStudent(student.id)) {
         toast.success('Student deleted successfully!');
-        setFilteredStudents(mockStudents);
         if (selectedStudent?.id === student.id) {
           setSelectedStudent(null);
         }
@@ -131,7 +116,6 @@ export function StudentsPage() {
     setIsAddModalOpen(false);
     setIsEditModalOpen(false);
     setEditingStudent(null);
-    setFilteredStudents(mockStudents);
     // Refresh the selected student if it was edited
     if (selectedStudent && editingStudent?.id === selectedStudent.id) {
       const updatedStudent = mockStudents.find(s => s.id === selectedStudent.id);

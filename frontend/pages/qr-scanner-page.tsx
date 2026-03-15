@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { ErrorBoundary } from '../components/error-boundary/error-boundary';
 import { useAuthStore } from '../store/auth-store';
-import { recordParentCall, mockStudents, mockLeaveRequests } from '../store/mock-data';
+import { recordParentCall, mockStudents, mockLeaveRequests, syncLeaveRequestsFromApi } from '../store/mock-data';
 import {
   Camera, Phone, CheckCircle, User, AlertTriangle,
   ScanLine, Clock, History, ArrowRight, ImagePlus,
@@ -125,6 +125,13 @@ export function QRScannerPage() {
       stopScanner();
     };
   }, [stopScanner]);
+
+  useEffect(() => {
+    if (!user?.id || (!isAdmin && !isWarden)) {
+      return;
+    }
+    void syncLeaveRequestsFromApi();
+  }, [user?.id, isAdmin, isWarden]);
 
   const handleCallNow = () => {
     if (!scanResult) return;

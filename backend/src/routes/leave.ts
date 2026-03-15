@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../db/init.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
 
@@ -10,25 +11,31 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
   try {
     const db = await getDb();
     const user = (req as any).user;
+    const collegeId = resolveCollegeId(user?.collegeId);
 
     let leaveRequests;
     if (user.role === 'admin' || user.role === 'warden') {
       leaveRequests = await db.all(`
-        SELECT lr.*, s.name as student_name, s.guardian_name, s.guardian_contact
+        SELECT lr.*, u.name as student_name, s.guardian_name, s.guardian_contact
         FROM leave_requests lr
         LEFT JOIN students s ON lr.student_id = s.id
+        LEFT JOIN users u ON s.user_id = u.id
+        WHERE lr.college_id = ?
         ORDER BY lr.submitted_at DESC
-      `);
+      `, [collegeId]);
     } else {
       // Students see only their own
-      const student = await db.get('SELECT id FROM students WHERE user_id = ?', [user.userId]);
+      const student = await db.get(
+        'SELECT id FROM students WHERE user_id = ? AND college_id = ?',
+        [user.userId, collegeId]
+      );
       if (!student) {
         res.json([]);
         return;
       }
       leaveRequests = await db.all(
-        'SELECT * FROM leave_requests WHERE student_id = ? ORDER BY submitted_at DESC',
-        [student.id]
+        'SELECT * FROM leave_requests WHERE student_id = ? AND college_id = ? ORDER BY submitted_at DESC',
+        [student.id, collegeId]
       );
     }
 
@@ -43,16 +50,29 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 router.post('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
+    const collegeId = resolveCollegeId(req.user?.collegeId);
     const { studentId, type, startDate, endDate, reason, emergencyContact } = req.body;
+
+    const student = await db.get(
+      'SELECT id FROM students WHERE id = ? AND college_id = ?',
+      [studentId, collegeId]
+    );
+
+    if (!student) {
+      res.status(404).json({ error: 'Student not found for this college' });
+      return;
+    }
 
     const id = uuidv4();
     await db.run(
-      `INSERT INTO leave_requests (id, student_id, type, start_date, end_date, reason, status, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', datetime('now'))`,
-      [id, studentId, type, startDate, endDate, reason]
+      `INSERT INTO leave_requests (
+        id, college_id, student_id, type, start_date, end_date, reason, emergency_contact, status, submitted_at
+      )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))`,
+      [id, collegeId, studentId, type, startDate, endDate, reason, emergencyContact || null]
     );
 
-    const leaveRequest = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
+    const leaveRequest = await db.get('SELECT * FROM leave_requests WHERE id = ? AND college_id = ?', [id, collegeId]);
     res.status(201).json(leaveRequest);
   } catch (error) {
     console.error('Create leave request error:', error);
@@ -69,9 +89,13 @@ router.patch(
     try {
       const db = await getDb();
       const user = (req as any).user;
+      const collegeId = resolveCollegeId(user?.collegeId);
       const { notes } = req.body;
 
-      const leaveRequest = await db.get('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
+      const leaveRequest = await db.get(
+        'SELECT * FROM leave_requests WHERE id = ? AND college_id = ?',
+        [req.params.id, collegeId]
+      );
       if (!leaveRequest) {
         res.status(404).json({ error: 'Leave request not found' });
         return;
@@ -88,11 +112,14 @@ router.patch(
              parent_call_timestamp = datetime('now'),
              parent_call_notes = ?,
              parent_call_by = ?
-         WHERE id = ?`,
-        [notes || '', user.userId, req.params.id]
+         WHERE id = ? AND college_id = ?`,
+        [notes || '', user.userId, req.params.id, collegeId]
       );
 
-      const updated = await db.get('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
+      const updated = await db.get(
+        'SELECT * FROM leave_requests WHERE id = ? AND college_id = ?',
+        [req.params.id, collegeId]
+      );
       res.json(updated);
     } catch (error) {
       console.error('Verify parent call error:', error);
@@ -110,9 +137,13 @@ router.patch(
     try {
       const db = await getDb();
       const user = (req as any).user;
+      const collegeId = resolveCollegeId(user?.collegeId);
       const { approverComments } = req.body;
 
-      const leaveRequest = await db.get('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
+      const leaveRequest = await db.get(
+        'SELECT * FROM leave_requests WHERE id = ? AND college_id = ?',
+        [req.params.id, collegeId]
+      );
       if (!leaveRequest) {
         res.status(404).json({ error: 'Leave request not found' });
         return;
@@ -129,17 +160,20 @@ router.patch(
              reviewed_at = datetime('now'),
              reviewed_by = ?,
              parent_approval_status = 'approved'
-         WHERE id = ?`,
-        [user.userId, req.params.id]
+         WHERE id = ? AND college_id = ?`,
+        [user.userId, req.params.id, collegeId]
       );
 
       // Update student status to 'on-leave'
       await db.run(
-        "UPDATE students SET current_status = 'on-leave' WHERE id = ?",
-        [leaveRequest.student_id]
+        "UPDATE students SET current_status = 'on-leave' WHERE id = ? AND college_id = ?",
+        [leaveRequest.student_id, collegeId]
       );
 
-      const updated = await db.get('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
+      const updated = await db.get(
+        'SELECT * FROM leave_requests WHERE id = ? AND college_id = ?',
+        [req.params.id, collegeId]
+      );
       res.json(updated);
     } catch (error) {
       console.error('Approve leave request error:', error);
@@ -157,6 +191,7 @@ router.patch(
     try {
       const db = await getDb();
       const user = (req as any).user;
+      const collegeId = resolveCollegeId(user?.collegeId);
       const { approverComments } = req.body;
 
       await db.run(
@@ -165,11 +200,14 @@ router.patch(
              reviewed_at = datetime('now'),
              reviewed_by = ?,
              parent_approval_status = 'rejected'
-         WHERE id = ?`,
-        [user.userId, req.params.id]
+         WHERE id = ? AND college_id = ?`,
+        [user.userId, req.params.id, collegeId]
       );
 
-      const updated = await db.get('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
+      const updated = await db.get(
+        'SELECT * FROM leave_requests WHERE id = ? AND college_id = ?',
+        [req.params.id, collegeId]
+      );
       res.json(updated);
     } catch (error) {
       console.error('Reject leave request error:', error);

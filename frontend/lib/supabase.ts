@@ -12,9 +12,49 @@ interface RegisteredCredential {
   role: string;
   userId: string;
   isActive: boolean;
+  collegeId?: string;
 }
 
 const credentialRegistry: RegisteredCredential[] = [];
+
+const DEFAULT_COLLEGE_ID = (import.meta.env.VITE_DEFAULT_COLLEGE_ID as string | undefined) || 'college-default';
+const ACTIVE_COLLEGE_STORAGE_KEY = 'tc-hostel-active-college-id';
+
+function setActiveCollegeId(collegeId?: string): void {
+  if (typeof window === 'undefined' || !collegeId?.trim()) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(ACTIVE_COLLEGE_STORAGE_KEY, collegeId.trim());
+  } catch {
+    // Ignore localStorage write errors.
+  }
+}
+
+function getActiveCollegeId(): string {
+  if (typeof window === 'undefined') {
+    return DEFAULT_COLLEGE_ID;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('collegeId') || params.get('college');
+    if (fromUrl?.trim()) {
+      setActiveCollegeId(fromUrl);
+      return fromUrl.trim();
+    }
+
+    const fromStorage = localStorage.getItem(ACTIVE_COLLEGE_STORAGE_KEY);
+    if (fromStorage?.trim()) {
+      return fromStorage.trim();
+    }
+  } catch {
+    // Ignore localStorage and URL parsing errors.
+  }
+
+  return DEFAULT_COLLEGE_ID;
+}
 
 /**
  * Register a credential for login.  
@@ -41,30 +81,47 @@ export const getRegisteredCredentials = () => credentialRegistry;
 /* ──────────────── Backend helpers ──────────────── */
 
 async function backendSignup(cred: RegisteredCredential): Promise<void> {
+  const collegeId = cred.collegeId || getActiveCollegeId();
   await fetch('/api/auth/signup', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-college-id': collegeId,
+    },
     body: JSON.stringify({
       email: cred.email,
       password: cred.generatedPassword,
       name: cred.name,
       role: cred.role,
       generatedId: cred.generatedId,
+      collegeId,
     }),
   });
 }
 
 interface BackendLoginResult {
-  user: { id: string; email: string; name: string; role: string; generated_id?: string; profile_image?: string };
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    college_id?: string;
+    generated_id?: string;
+    profile_image?: string;
+  };
   token: string;
 }
 
 async function backendLogin(identifier: string, password: string): Promise<BackendLoginResult | null> {
   try {
+    const collegeId = getActiveCollegeId();
     const res = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: identifier, password }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-college-id': collegeId,
+      },
+      body: JSON.stringify({ email: identifier, password, collegeId }),
     });
     if (!res.ok) return null;
     return (await res.json()) as BackendLoginResult;
@@ -86,6 +143,7 @@ const MOCK_USERS = [
       name: 'System Administrator',
       email: 'admin@tchostel.edu',
       role: 'admin',
+      college_id: DEFAULT_COLLEGE_ID,
       profile_image: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
       is_active: true,
       last_login: new Date().toISOString(),
@@ -102,6 +160,7 @@ const MOCK_USERS = [
       name: 'Dr. Priya Sharma',
       email: 'warden@tchostel.edu',
       role: 'warden',
+      college_id: DEFAULT_COLLEGE_ID,
       profile_image: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
       is_active: true,
       last_login: new Date().toISOString(),
@@ -118,6 +177,7 @@ const MOCK_USERS = [
       name: 'Rajesh Kumar',
       email: 'staff@tchostel.edu',
       role: 'staff',
+      college_id: DEFAULT_COLLEGE_ID,
       profile_image: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
       is_active: true,
       last_login: new Date().toISOString(),
@@ -135,6 +195,7 @@ const MOCK_USERS = [
       name: 'Arjun Sharma',
       email: 'student@tchostel.edu',
       role: 'student',
+      college_id: DEFAULT_COLLEGE_ID,
       profile_image: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
       is_active: true,
       last_login: new Date().toISOString(),
@@ -159,10 +220,12 @@ export const supabase = {
         console.log('✅ Backend login successful for:', backendResult.user.email);
 
         const bu = backendResult.user;
+        const collegeId = bu.college_id || getActiveCollegeId();
+        setActiveCollegeId(collegeId);
         const mockUser: SupabaseUser = {
           id: bu.id,
           email: bu.email!,
-          user_metadata: { role: bu.role },
+          user_metadata: { role: bu.role, college_id: collegeId },
           app_metadata: {},
           aud: 'authenticated',
           created_at: new Date().toISOString(),
@@ -191,6 +254,7 @@ export const supabase = {
           expires_in: 604800,
           expires_at: Date.now() + 604800000,
           token_type: 'bearer',
+          college_id: collegeId,
           user: mockUser,
         };
 
@@ -202,6 +266,7 @@ export const supabase = {
           name: bu.name,
           email: bu.email,
           role: bu.role,
+          college_id: collegeId,
           profile_image: bu.profile_image || '',
           is_active: true,
           last_login: new Date().toISOString(),
@@ -215,7 +280,7 @@ export const supabase = {
             id: bu.id,
             email: bu.email,
             password: '',
-            user_metadata: { role: bu.role },
+            user_metadata: { role: bu.role, college_id: collegeId },
             profile: backendProfile,
           });
         }
@@ -245,17 +310,19 @@ export const supabase = {
 
         if (credential) {
           const authId = credential.userId;
+          const collegeId = credential.collegeId || getActiveCollegeId();
           user = {
             id: authId,
             email: credential.email,
             password: credential.generatedPassword,
-            user_metadata: { role: credential.role },
+            user_metadata: { role: credential.role, college_id: collegeId },
             profile: {
               id: authId,
               auth_id: authId,
               name: credential.name,
               email: credential.email,
               role: credential.role,
+              college_id: collegeId,
               profile_image: '',
               is_active: true,
               last_login: new Date().toISOString(),
@@ -272,10 +339,16 @@ export const supabase = {
         };
       }
 
+      const collegeId = user.profile?.college_id || getActiveCollegeId();
+      setActiveCollegeId(collegeId);
+      if (!user.profile.college_id) {
+        user.profile.college_id = collegeId;
+      }
+
       const mockUser: SupabaseUser = {
         id: user.id,
         email: user.email,
-        user_metadata: user.user_metadata,
+        user_metadata: { ...user.user_metadata, college_id: collegeId },
         app_metadata: {},
         aud: 'authenticated',
         created_at: new Date().toISOString(),
@@ -304,6 +377,7 @@ export const supabase = {
         expires_in: 3600,
         expires_at: Date.now() + 3600000,
         token_type: 'bearer',
+        college_id: collegeId,
         user: mockUser,
       };
 
@@ -322,6 +396,7 @@ export const supabase = {
           const session = JSON.parse(stored);
           if (session.expires_at > Date.now()) {
             currentSession = session;
+            setActiveCollegeId(session.college_id || session?.user?.user_metadata?.college_id);
             return { data: { session }, error: null };
           } else {
             localStorage.removeItem('tc-hostel-enhanced-session');
@@ -405,7 +480,12 @@ export const getCurrentUser = async () => {
 export const getUserProfile = async (authId: string) => {
   // 1. Try MOCK_USERS first (instant, works for mock & cached backend users)
   const mockUser = MOCK_USERS.find(u => u.id === authId);
-  if (mockUser) return mockUser.profile;
+  if (mockUser) {
+    const collegeId = mockUser.profile.college_id || getActiveCollegeId();
+    mockUser.profile.college_id = collegeId;
+    setActiveCollegeId(collegeId);
+    return mockUser.profile;
+  }
 
   // 2. Try the real backend using the stored JWT (handles page refresh)
   try {
@@ -425,16 +505,18 @@ export const getUserProfile = async (authId: string) => {
             name: bu.name,
             email: bu.email,
             role: bu.role,
+            college_id: bu.college_id || getActiveCollegeId(),
             profile_image: bu.profile_image || '',
             is_active: bu.is_active ?? true,
             last_login: new Date().toISOString(),
           };
+          setActiveCollegeId(profile.college_id);
           // Cache in MOCK_USERS for future lookups
           MOCK_USERS.push({
             id: bu.id,
             email: bu.email,
             password: '',
-            user_metadata: { role: bu.role },
+            user_metadata: { role: bu.role, college_id: profile.college_id },
             profile,
           });
           return profile;
@@ -450,7 +532,12 @@ export const getUserProfile = async (authId: string) => {
 
 export const createUserProfile = async (authUser: any, additionalData: any = {}) => {
   const user = MOCK_USERS.find(u => u.id === authUser.id);
-  if (user) return user.profile;
+  if (user) {
+    const collegeId = user.profile.college_id || additionalData.college_id || authUser?.user_metadata?.college_id || getActiveCollegeId();
+    user.profile.college_id = collegeId;
+    setActiveCollegeId(collegeId);
+    return user.profile;
+  }
   throw new Error('User not found in mock data');
 };
 
