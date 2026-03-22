@@ -32,7 +32,6 @@ interface InfiniteListProps<T extends { id?: string | number }> {
   renderError?: (error: Error, retry: () => void) => React.ReactNode;
   
   // Optional customization
-  itemsPerPage?: number;
   containerClassName?: string;
   itemClassName?: string;
   skeletonCount?: number;
@@ -55,7 +54,6 @@ export function InfiniteList<T extends { id?: string | number }>({
   renderSkeleton = () => <div className="h-16 bg-gray-200 rounded animate-pulse" />,
   renderEmpty = () => <div className="text-center text-gray-500 py-8">No items found</div>,
   renderError,
-  itemsPerPage = 50,
   containerClassName = '',
   itemClassName = '',
   skeletonCount = 3,

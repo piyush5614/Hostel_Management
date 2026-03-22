@@ -69,10 +69,10 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     if (error) throw error;
 
-    const items = records || [];
+    const items = ((records as unknown) as Array<{ id: string | number }>) || [];
     const hasMore = items.length > limit;
     const pageItems = hasMore ? items.slice(0, limit) : items;
-    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : undefined;
+    const nextCursor = hasMore ? (pageItems[pageItems.length - 1] as { id?: string | number })?.id : undefined;
 
     res.json({
       data: pageItems,

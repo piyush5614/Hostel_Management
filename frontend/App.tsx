@@ -29,6 +29,10 @@ import { NotificationHandler } from './components/notifications/notification-han
 import { useAuthStore } from './store/auth-store';
 import { LanguageProvider } from './lib/language-context';
 import { useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Create query client instance (outside component to prevent recreation)
+const queryClient = new QueryClient();
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -80,10 +84,11 @@ function App() {
   }
   
   return (
-    <LanguageProvider>
-      <NotificationProvider>
-        <ErrorBoundary>
-          <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <NotificationProvider>
+          <ErrorBoundary>
+            <BrowserRouter>
             <NotificationHandler />
             <Routes>
               {/* Public route - Login page */}
@@ -134,6 +139,7 @@ function App() {
         </ErrorBoundary>
       </NotificationProvider>
     </LanguageProvider>
+    </QueryClientProvider>
   );
 }
 

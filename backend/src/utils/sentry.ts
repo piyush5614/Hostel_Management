@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 /**
  * Initialize Sentry for production error tracking
@@ -24,7 +23,7 @@ export function initSentry() {
   Sentry.init({
     dsn,
     environment,
-    integrations: [nodeProfilingIntegration()],
+    integrations: [],
     // Set sample rate to 1.0 to capture 100% of transactions for performance monitoring
     // Reduce to 0.1 (10%) for high-traffic applications
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,

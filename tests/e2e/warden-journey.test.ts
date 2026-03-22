@@ -136,7 +136,7 @@ test.describe('Warden Journey - E2E Tests (CRITICAL)', () => {
 
         // Verify status changed
         const rejectedStatus = secondApp.locator('text=/rejected|declined/i');
-        expect(rejectedStatus.count() > 0 || page.url().includes('leave')).toBeTruthy();
+        expect((await rejectedStatus.count() > 0) || page.url().includes('leave')).toBeTruthy();
       }
     }
   });
