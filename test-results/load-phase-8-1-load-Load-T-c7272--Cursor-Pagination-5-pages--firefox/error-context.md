@@ -1,0 +1,81 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e8]:
+  - generic [ref=e9]:
+    - img [ref=e14]
+    - generic [ref=e21]:
+      - heading "TC Hostel Connect" [level=3] [ref=e22]
+      - paragraph [ref=e23]: Modern Hostel Management System
+      - generic [ref=e24]:
+        - img [ref=e25]
+        - generic [ref=e31]: Enhanced Development Environment
+        - img [ref=e32]
+  - generic [ref=e38]:
+    - generic [ref=e39]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: Email Address or Staff/Student ID
+        - textbox "Email Address or Staff/Student ID" [ref=e43]:
+          - /placeholder: Email or ID (e.g. STAFF-0001)
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]: Password
+          - textbox "Password" [ref=e47]:
+            - /placeholder: Enter your password
+        - button [ref=e48] [cursor=pointer]:
+          - img [ref=e49]
+      - generic [ref=e52]:
+        - generic [ref=e53] [cursor=pointer]:
+          - checkbox "Remember me" [ref=e54]
+          - generic [ref=e55]: Remember me
+        - button "Forgot password?" [ref=e56] [cursor=pointer]
+      - button "Sign In to Dashboard" [disabled]:
+        - generic:
+          - generic:
+            - img
+            - text: Sign In to Dashboard
+    - generic [ref=e57]:
+      - generic [ref=e62]: Demo Accounts
+      - generic [ref=e63]:
+        - button "Admin admin123" [ref=e64] [cursor=pointer]:
+          - generic [ref=e66]:
+            - img [ref=e67]
+            - generic [ref=e69]:
+              - generic [ref=e70]: Admin
+              - generic [ref=e71]: admin123
+        - button "Warden warden123" [ref=e73] [cursor=pointer]:
+          - generic [ref=e75]:
+            - img [ref=e76]
+            - generic [ref=e84]:
+              - generic [ref=e85]: Warden
+              - generic [ref=e86]: warden123
+        - button "Staff staff123" [ref=e88] [cursor=pointer]:
+          - generic [ref=e90]:
+            - img [ref=e91]
+            - generic [ref=e96]:
+              - generic [ref=e97]: Staff
+              - generic [ref=e98]: staff123
+        - button "Student student123" [ref=e100] [cursor=pointer]:
+          - generic [ref=e102]:
+            - img [ref=e103]
+            - generic [ref=e110]:
+              - generic [ref=e111]: Student
+              - generic [ref=e112]: student123
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - img [ref=e117]
+          - generic [ref=e119]: Enhanced Demo Mode
+          - img [ref=e120]
+        - paragraph [ref=e122]:
+          - text: Click any demo account button for instant access.
+          - text: New secure passwords implemented
+    - generic [ref=e124]:
+      - generic [ref=e125]:
+        - img [ref=e126]
+        - generic [ref=e129]: Need Assistance?
+      - paragraph [ref=e130]:
+        - text: "Technical Support:"
+        - link "support@tchostel.edu" [ref=e131] [cursor=pointer]:
+          - /url: mailto:support@tchostel.edu
+      - paragraph [ref=e132]: "🕒 Available 24/7 • 📞 Emergency: +91-9876543210"
+```
