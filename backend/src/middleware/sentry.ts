@@ -11,8 +11,6 @@
  */
 
 import * as Sentry from '@sentry/node';
-import * as Tracing from '@sentry/tracing';
-import { Express } from 'express';
 
 /**
  * Initialize Sentry error tracking
@@ -30,11 +28,6 @@ export function initSentry(): void {
     environment: process.env.NODE_ENV || 'development',
     integrations: [
       new Sentry.Integrations.Http({ tracing: true }),
-      new Tracing.Integrations.Express({ 
-        app: true, 
-        request: true,
-        middleware: true
-      }),
     ],
     // Sample 10% of transactions for tracing
     tracesSampleRate: 0.1,
