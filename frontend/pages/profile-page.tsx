@@ -29,6 +29,7 @@ export function ProfilePage() {
 
   const isStaffUser = user?.role === 'staff' || user?.role === 'warden' || user?.role === 'admin';
   const profileRecord = isStaffUser ? staffData : studentData;
+  const displayProfileImage = user?.profileImage || profileRecord?.profileImage || null;
   
   // Unified form data — works for both students and staff
   const [formData, setFormData] = useState({
@@ -249,9 +250,9 @@ export function ProfilePage() {
           </CardHeader>
           <CardContent className="text-center">
             <div className="relative mx-auto mb-6 h-40 w-40 group">
-              {user.profileImage ? (
+              {displayProfileImage ? (
                 <img
-                  src={user.profileImage}
+                  src={displayProfileImage}
                   alt={user.name}
                   className="h-40 w-40 rounded-full object-cover border-4 border-white shadow-2xl group-hover:shadow-3xl transition-all duration-300 hover:scale-105"
                 />

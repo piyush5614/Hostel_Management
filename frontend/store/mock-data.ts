@@ -1428,6 +1428,7 @@ if (persisted?.credentials) {
       role: 'staff',
       userId: st.userId,
       isActive: st.isActive,
+      profileImage: st.profileImage,
     });
   });
 
@@ -1523,6 +1524,19 @@ export const addStaff = (staff: Omit<Staff, 'id'>): Staff => {
     isActive: true,
     generatedPassword: credential.generatedPassword,
   };
+
+  // Re-register so the auth fallback profile includes latest staff details and image.
+  registerCredentialForLogin({
+    email: newStaff.email,
+    generatedId: newStaff.employeeId,
+    generatedPassword: credential.generatedPassword,
+    name: newStaff.name,
+    role: 'staff',
+    userId: newStaff.userId,
+    isActive: newStaff.isActive,
+    profileImage: newStaff.profileImage,
+  });
+
   mockStaff.push(newStaff);
   addActivityLog('system', 'System', 'created', 'staff', newStaff.id, `Staff member ${newStaff.name} added`);
   saveToStorage();
@@ -1533,7 +1547,20 @@ export const addStaff = (staff: Omit<Staff, 'id'>): Staff => {
 export const updateStaffMember = (id: string, updates: Partial<Staff>): Staff | null => {
   const idx = mockStaff.findIndex(s => s.id === id);
   if (idx !== -1) {
-    mockStaff[idx] = { ...mockStaff[idx], ...updates };
+    const existing = mockStaff[idx];
+    mockStaff[idx] = { ...existing, ...updates };
+
+    registerCredentialForLogin({
+      email: mockStaff[idx].email,
+      generatedId: mockStaff[idx].employeeId,
+      generatedPassword: mockStaff[idx].generatedPassword || existing.generatedPassword || 'staff123',
+      name: mockStaff[idx].name,
+      role: 'staff',
+      userId: mockStaff[idx].userId,
+      isActive: mockStaff[idx].isActive,
+      profileImage: mockStaff[idx].profileImage,
+    });
+
     addActivityLog('system', 'System', 'updated', 'staff', id, `Staff member ${mockStaff[idx].name} updated`);
     saveToStorage();
     eventBus.emit(EVENTS.STAFF_UPDATED);

@@ -13,6 +13,7 @@ interface RegisteredCredential {
   userId: string;
   isActive: boolean;
   collegeId?: string;
+  profileImage?: string;
 }
 
 const credentialRegistry: RegisteredCredential[] = [];
@@ -95,6 +96,7 @@ async function backendSignup(cred: RegisteredCredential): Promise<void> {
       role: cred.role,
       generatedId: cred.generatedId,
       collegeId,
+      profileImage: cred.profileImage,
     }),
   });
 }
@@ -323,7 +325,7 @@ export const supabase = {
               email: credential.email,
               role: credential.role,
               college_id: collegeId,
-              profile_image: '',
+              profile_image: credential.profileImage || '',
               is_active: true,
               last_login: new Date().toISOString(),
             },

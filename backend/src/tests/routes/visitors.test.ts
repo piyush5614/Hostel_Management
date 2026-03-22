@@ -115,7 +115,7 @@ describe('Visitors API', () => {
         })
         .expect(201);
 
-      expect(response.body).toHaveProperty('check_in');
+      expect(response.body).toHaveProperty('check_in_time');
     });
 
     it('should validate phone number if provided', async () => {
@@ -139,7 +139,7 @@ describe('Visitors API', () => {
         .expect(200);
 
       expect(response.body.status).toBe('checked_out');
-      expect(response.body).toHaveProperty('check_out');
+      expect(response.body).toHaveProperty('check_out_time');
     });
 
     it('should record check-out time', async () => {
@@ -174,8 +174,8 @@ describe('Visitors API', () => {
 
       if (response.body.length > 0) {
         const record = response.body[0];
-        expect(record).toHaveProperty('check_in');
-        expect(record).toHaveProperty('check_out');
+         expect(record).toHaveProperty('check_in_time');
+         expect(record).toHaveProperty('check_out_time');
       }
     });
   });
