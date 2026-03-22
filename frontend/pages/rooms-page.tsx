@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
@@ -17,6 +18,7 @@ import { useDataRefresh } from '../utils/use-data-refresh';
 import { EVENTS } from '../utils/event-bus';
 
 export function RoomsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const refreshKey = useDataRefresh([EVENTS.ROOM_UPDATED, EVENTS.STUDENT_UPDATED]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>(mockRooms);

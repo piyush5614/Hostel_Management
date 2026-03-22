@@ -17,22 +17,24 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    let sql = 'SELECT * FROM staff WHERE college_id = ?';
-    const params: any[] = [collegeId];
+    let query = db
+      .from('staff')
+      .select('*')
+      .eq('college_id', collegeId)
+      .order('created_at', { ascending: false });
 
     if (typeof req.query.isActive === 'string') {
-      sql += ' AND is_active = ?';
-      params.push(req.query.isActive === 'true' ? 1 : 0);
+      query = query.eq('is_active', req.query.isActive === 'true');
     }
 
     if (user.role === 'staff') {
-      sql += ' AND user_id = ?';
-      params.push(user.userId);
+      query = query.eq('user_id', user.userId);
     }
 
-    sql += ' ORDER BY created_at DESC';
+    const { data: staff, error } = await query;
 
-    const staff = await db.all(sql, params);
+    if (error) throw error;
+
     res.json(staff || []);
   } catch (error) {
     console.error('Get staff error:', error);
@@ -51,20 +53,19 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    let staff;
+    let query = db
+      .from('staff')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId);
+
     if (user.role === 'staff') {
-      staff = await db.get(
-        'SELECT * FROM staff WHERE id = ? AND college_id = ? AND user_id = ?',
-        [req.params.id, collegeId, user.userId]
-      );
-    } else {
-      staff = await db.get(
-        'SELECT * FROM staff WHERE id = ? AND college_id = ?',
-        [req.params.id, collegeId]
-      );
+      query = query.eq('user_id', user.userId);
     }
 
-    if (!staff) {
+    const { data: staff, error } = await query.single();
+
+    if (error || !staff) {
       res.status(404).json({ error: 'Staff not found' });
       return;
     }
@@ -89,12 +90,14 @@ router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request
       return;
     }
 
-    const linkedUser = await db.get(
-      'SELECT id FROM users WHERE id = ? AND college_id = ?',
-      [userId, collegeId]
-    );
+    const { data: linkedUser, error: linkedUserError } = await db
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!linkedUser) {
+    if (linkedUserError || !linkedUser) {
       res.status(404).json({ error: 'Linked user not found for this college' });
       return;
     }
@@ -107,29 +110,37 @@ router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request
     const shiftTiming = req.body.shift_timing || req.body.shiftTiming || '08:00-16:00';
     const department = req.body.department || '';
 
-    await db.run(
-      `INSERT INTO staff (
-        id, college_id, user_id, employee_id, position, contact_number, address, joining_date, shift_timing, department, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [
-        staffId,
-        collegeId,
-        userId,
-        employeeId,
+    const { error: insertError } = await db.from('staff').insert([
+      {
+        id: staffId,
+        college_id: collegeId,
+        user_id: userId,
+        employee_id: employeeId,
         position,
-        contactNumber,
+        contact_number: contactNumber,
         address,
-        joiningDate,
-        shiftTiming,
+        joining_date: joiningDate,
+        shift_timing: shiftTiming,
         department,
-      ]
-    );
+        is_active: true,
+      },
+    ]);
 
-    const created = await db.get('SELECT * FROM staff WHERE id = ? AND college_id = ?', [staffId, collegeId]);
+    if (insertError) throw insertError;
+
+    const { data: created, error: fetchError } = await db
+      .from('staff')
+      .select('*')
+      .eq('id', staffId)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     res.status(201).json(created);
   } catch (error: any) {
     console.error('Create staff error:', error);
-    if (error?.code === 'SQLITE_CONSTRAINT') {
+    if (error?.code === '23505' || error?.message?.includes('duplicate')) {
       res.status(409).json({ error: 'A staff member with this employeeId or userId already exists' });
       return;
     }
@@ -142,17 +153,19 @@ router.patch('/:id', authenticate, authorize('admin', 'warden'), async (req: Req
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
 
-    const existing = await db.get(
-      'SELECT * FROM staff WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    const { data: existing, error: fetchError } = await db
+      .from('staff')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!existing) {
+    if (fetchError || !existing) {
       res.status(404).json({ error: 'Staff not found' });
       return;
     }
 
-    const updates: Array<{ column: string; value: any }> = [];
+    const updates: Record<string, any> = {};
 
     const map = [
       ['employeeId', 'employee_id'],
@@ -171,32 +184,38 @@ router.patch('/:id', authenticate, authorize('admin', 'warden'), async (req: Req
     ] as const;
 
     for (const [inputKey, column] of map) {
-      if (req.body[inputKey] !== undefined) {
-        const value = column === 'is_active'
-          ? (req.body[inputKey] ? 1 : 0)
-          : req.body[inputKey];
-        updates.push({ column, value });
+      if (req.body[inputKey] !== undefined && !(column in updates)) {
+        const value = column === 'is_active' ? !!req.body[inputKey] : req.body[inputKey];
+        updates[column] = value;
       }
     }
 
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'No valid fields provided for update' });
       return;
     }
 
-    const setClause = updates.map((u) => `${u.column} = ?`).join(', ');
-    const values = updates.map((u) => u.value);
+    const { error: updateError } = await db
+      .from('staff')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId);
 
-    await db.run(
-      `UPDATE staff SET ${setClause} WHERE id = ? AND college_id = ?`,
-      [...values, req.params.id, collegeId]
-    );
+    if (updateError) throw updateError;
 
-    const updated = await db.get('SELECT * FROM staff WHERE id = ? AND college_id = ?', [req.params.id, collegeId]);
+    const { data: updated, error: refetchError } = await db
+      .from('staff')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (refetchError) throw refetchError;
+
     res.json(updated);
   } catch (error: any) {
     console.error('Update staff error:', error);
-    if (error?.code === 'SQLITE_CONSTRAINT') {
+    if (error?.code === '23505' || error?.message?.includes('duplicate')) {
       res.status(409).json({ error: 'Constraint violation while updating staff' });
       return;
     }

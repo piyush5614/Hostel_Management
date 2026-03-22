@@ -2,6 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { DisplayModeProvider } from './lib/display-mode';
+import './lib/i18n'; // Initialize i18next
+import { I18nextProvider } from 'react-i18next';
+import i18n from './lib/i18n';
 
 import { measurePageLoad } from './utils/performance-monitor';
 
@@ -25,7 +29,11 @@ try {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <I18nextProvider i18n={i18n}>
+      <DisplayModeProvider>
+        <App />
+      </DisplayModeProvider>
+    </I18nextProvider>
   </StrictMode>
 );
 

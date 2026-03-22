@@ -4,6 +4,7 @@ import { getDb } from '../db/init.js';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
 import { authenticate, getRequestCollegeId } from '../middleware/auth.js';
 import { resolveCollegeId } from '../utils/tenant.js';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -22,39 +23,69 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     const db = await getDb();
 
     // Check if the user already exists (by email or by generated_id)
-    let existing = await db.get(
-      'SELECT id, email FROM users WHERE college_id = ? AND email = ?',
-      [collegeId, email]
-    );
+    let existingQuery = db
+      .from('users')
+      .select('id, email')
+      .eq('college_id', collegeId)
+      .eq('email', email);
+
+    let { data: existing, error: selectErr } = await existingQuery;
+
     if (!existing && generatedId) {
-      existing = await db.get(
-        'SELECT id, email FROM users WHERE college_id = ? AND generated_id = ?',
-        [collegeId, generatedId]
-      );
+      const { data: existingById, error: selectByIdErr } = await db
+        .from('users')
+        .select('id, email')
+        .eq('college_id', collegeId)
+        .eq('generated_id', generatedId);
+
+      if (!selectByIdErr && existingById && existingById.length > 0) {
+        existing = existingById;
+      }
     }
 
-    if (existing) {
+    if (existing && existing.length > 0) {
       // Update the existing user's password (and generated_id / name if provided)
       const hashedPassword = await hashPassword(password);
-      try {
-        await db.run(
-          `UPDATE users SET password = ?, name = ?, role = ?, generated_id = COALESCE(?, generated_id) WHERE id = ? AND college_id = ?`,
-          [hashedPassword, name, role, generatedId || null, existing.id, collegeId]
-        );
-      } catch (updateErr: any) {
+      const existingUser = existing[0];
+
+      const updateData: any = {
+        password: hashedPassword,
+        name,
+        role,
+      };
+
+      if (generatedId) {
+        updateData.generated_id = generatedId;
+      }
+
+      const { error: updateErr } = await db
+        .from('users')
+        .update(updateData)
+        .eq('id', existingUser.id)
+        .eq('college_id', collegeId);
+
+      if (updateErr) {
         // If generated_id conflicts with another user, skip the generated_id update
-        if (updateErr.code === 'SQLITE_CONSTRAINT') {
-          await db.run(
-            `UPDATE users SET password = ?, name = ?, role = ? WHERE id = ? AND college_id = ?`,
-            [hashedPassword, name, role, existing.id, collegeId]
-          );
+        if (updateErr.message?.includes('duplicate') || updateErr.code?.includes('UNIQUE')) {
+          const { error: retryErr } = await db
+            .from('users')
+            .update({
+              password: hashedPassword,
+              name,
+              role,
+            })
+            .eq('id', existingUser.id)
+            .eq('college_id', collegeId);
+
+          if (retryErr) throw retryErr;
         } else {
           throw updateErr;
         }
       }
-      const token = generateToken({ userId: existing.id, email: existing.email, role, collegeId });
+
+      const token = generateToken({ userId: existingUser.id, email: existingUser.email, role, collegeId });
       res.status(200).json({
-        user: { id: existing.id, email: existing.email, name, role, college_id: collegeId },
+        user: { id: existingUser.id, email: existingUser.email, name, role, college_id: collegeId },
         token,
       });
       return;
@@ -64,30 +95,49 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     const hashedPassword = await hashPassword(password);
 
     try {
-      await db.run(
-        'INSERT INTO users (id, college_id, email, password, name, role, generated_id, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
-        [userId, collegeId, email, hashedPassword, name, role, generatedId || null]
-      );
-    } catch (insertErr: any) {
-      if (insertErr.code === 'SQLITE_CONSTRAINT') {
-        // Race condition – user was inserted between our SELECT and INSERT
-        const found = await db.get('SELECT id, email FROM users WHERE college_id = ? AND email = ?', [collegeId, email]);
-        if (found) {
-          const token = generateToken({ userId: found.id, email: found.email, role, collegeId });
-          res.status(200).json({
-            user: { id: found.id, email: found.email, name, role, college_id: collegeId },
-            token,
-          });
-          return;
+      const { error: insertErr } = await db.from('users').insert([
+        {
+          id: userId,
+          college_id: collegeId,
+          email,
+          password: hashedPassword,
+          name,
+          role,
+          generated_id: generatedId || null,
+          is_active: true,
+        },
+      ]);
+
+      if (insertErr) {
+        if (insertErr.message?.includes('duplicate') || insertErr.code?.includes('UNIQUE')) {
+          // Race condition – user was inserted between our SELECT and INSERT
+          const { data: found } = await db
+            .from('users')
+            .select('id, email')
+            .eq('college_id', collegeId)
+            .eq('email', email);
+
+          if (found && found.length > 0) {
+            const foundUser = found[0];
+            const token = generateToken({ userId: foundUser.id, email: foundUser.email, role, collegeId });
+            res.status(200).json({
+              user: { id: foundUser.id, email: foundUser.email, name, role, college_id: collegeId },
+              token,
+            });
+            return;
+          }
         }
+        throw insertErr;
       }
+    } catch (insertErr: any) {
+      log.error('Signup insert error', insertErr, { email });
       throw insertErr;
     }
 
     const token = generateToken({ userId, email, role, collegeId });
     res.status(201).json({ user: { id: userId, email, name, role, college_id: collegeId }, token });
   } catch (error) {
-    console.error('Signup error:', error);
+    log.error('Signup error', error, { path: '/signup' });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -99,27 +149,50 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const collegeId = getRequestCollegeId(req);
 
     if (!email || !password) {
+      log.warn('Login attempt with missing credentials', { email });
       res.status(400).json({ error: 'Email/ID and password are required' });
       return;
     }
 
     const db = await getDb();
 
-    // Try matching by email first, then by generated_id
-    let user = await db.get('SELECT * FROM users WHERE college_id = ? AND email = ? AND is_active = 1', [collegeId, email]);
+    // Try matching by email first
+    let { data: users, error: selectErr } = await db
+      .from('users')
+      .select('*')
+      .eq('college_id', collegeId)
+      .eq('email', email)
+      .eq('is_active', true);
+
+    let user = users && users.length > 0 ? users[0] : null;
+
+    // If not found by email, try by generated_id
     if (!user) {
-      user = await db.get('SELECT * FROM users WHERE college_id = ? AND generated_id = ? AND is_active = 1', [collegeId, email]);
+      const { data: usersById } = await db
+        .from('users')
+        .select('*')
+        .eq('college_id', collegeId)
+        .eq('generated_id', email)
+        .eq('is_active', true);
+
+      user = usersById && usersById.length > 0 ? usersById[0] : null;
     }
 
     if (!user || !(await comparePassword(password, user.password))) {
+      log.warn('Login failed - invalid credentials', { email, ip: req.ip });
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
-    await db.run('UPDATE users SET last_login = ? WHERE id = ?', [
-      new Date().toISOString(),
-      user.id,
-    ]);
+    // Update last_login timestamp
+    const { error: updateErr } = await db
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
+    if (updateErr) {
+      log.warn('Failed to update last_login', { error: updateErr, userId: user.id });
+    }
 
     const resolvedCollegeId = resolveCollegeId(user.college_id);
     const token = generateToken({
@@ -128,6 +201,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       collegeId: resolvedCollegeId,
     });
+
+    log.auth('Login successful', user.id, email);
+
     res.json({
       user: {
         id: user.id,
@@ -141,7 +217,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       token,
     });
   } catch (error) {
-    console.error('Login error:', error);
+    log.error('Login route error', error, { path: '/login' });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -150,19 +226,22 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
   try {
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
-    const user = await db.get(
-      'SELECT id, email, name, role, profile_image, generated_id, is_active, college_id FROM users WHERE id = ? AND college_id = ?',
-      [req.user?.userId, collegeId]
-    );
 
-    if (!user) {
+    const { data: users, error } = await db
+      .from('users')
+      .select('id, email, name, role, profile_image, generated_id, is_active, college_id')
+      .eq('id', req.user?.userId)
+      .eq('college_id', collegeId);
+
+    if (error || !users || users.length === 0) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
 
+    const user = users[0];
     res.json(user);
   } catch (error) {
-    console.error('Get user error:', error);
+    log.error('Get user error', error, { path: '/me' });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

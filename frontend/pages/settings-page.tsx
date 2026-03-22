@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { useAuthStore } from '../store/auth-store';
+import { useLanguage } from '../lib/language-context';
 import { mockUserSettings } from '../store/mock-data';
 import { UserSettings } from '../types';
 import { Bell, Shield, Palette, MessageSquare, Save, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const { changeLanguage, currentLanguage } = useLanguage();
   
   // Find or create user settings
   const existingSettings = mockUserSettings.find(s => s.userId === user?.id);
@@ -108,10 +112,10 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Settings</h1>
+        <h1 className="text-3xl font-bold">{t('settings.title')}</h1>
         <Button onClick={handleSave}>
           <Save className="mr-2 h-4 w-4" />
-          Save Changes
+          {t('header.saveChanges')}
         </Button>
       </div>
 
@@ -121,7 +125,7 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Bell className="mr-2 h-5 w-5" />
-              Notification Preferences
+              {t('settings.communicationPreferences')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -241,35 +245,39 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Palette className="mr-2 h-5 w-5" />
-              Display Preferences
+              {t('settings.displayPreferences')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Select
-              label="Theme"
+              label={t('settings.theme')}
               options={[
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-                { value: 'auto', label: 'Auto' },
+                { value: 'light', label: t('settings.light') },
+                { value: 'dark', label: t('settings.dark') },
+                { value: 'auto', label: t('settings.auto') },
               ]}
               value={settings.display.theme}
               onChange={(e) => updateDisplaySetting('theme', e.target.value)}
             />
 
             <Select
-              label="Language"
+              label={t('settings.language')}
               options={[
-                { value: 'en', label: 'English' },
-                { value: 'hi', label: 'Hindi' },
-                { value: 'ta', label: 'Tamil' },
-                { value: 'te', label: 'Telugu' },
+                { value: 'en', label: t('settings.english') },
+                { value: 'hi', label: t('settings.hindi') },
+                { value: 'mr', label: t('settings.marathi') },
               ]}
-              value={settings.display.language}
-              onChange={(e) => updateDisplaySetting('language', e.target.value)}
+              value={currentLanguage}
+              onChange={(e) => {
+                changeLanguage(e.target.value);
+                updateDisplaySetting('language', e.target.value);
+                const langNames: { [key: string]: string } = {'en': 'English', 'hi': 'हिंदी', 'mr': 'मराठी'};
+                toast.success(`${t('settings.language')} changed to ${langNames[e.target.value]}`);
+              }}
             />
 
             <Select
-              label="Date Format"
+              label={t('settings.dateFormat')}
               options={[
                 { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
                 { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
@@ -280,7 +288,7 @@ export function SettingsPage() {
             />
 
             <Select
-              label="Time Format"
+              label={t('settings.timeFormat')}
               options={[
                 { value: '12h', label: '12 Hour' },
                 { value: '24h', label: '24 Hour' },

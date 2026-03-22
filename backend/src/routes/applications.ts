@@ -12,43 +12,40 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
-    let sql = `
-      SELECT a.*, u.name AS student_name, s.enrollment_number
-      FROM applications a
-      LEFT JOIN students s ON s.id = a.student_id
-      LEFT JOIN users u ON u.id = s.user_id
-      WHERE a.college_id = ?
-    `;
-    const params: any[] = [collegeId];
+    let query = db
+      .from('applications')
+      .select('*, students(user_id, enrollment_number, users(name))')
+      .eq('college_id', collegeId)
+      .order('submitted_at', { ascending: false });
 
     if (user?.role === 'student') {
-      const student = await db.get(
-        'SELECT id FROM students WHERE user_id = ? AND college_id = ?',
-        [user.userId, collegeId]
-      );
+      const { data: student, error: studentError } = await db
+        .from('students')
+        .select('id')
+        .eq('user_id', user.userId)
+        .eq('college_id', collegeId)
+        .single();
 
-      if (!student) {
+      if (studentError || !student) {
         res.json([]);
         return;
       }
 
-      sql += ' AND a.student_id = ?';
-      params.push(student.id);
+      query = query.eq('student_id', student.id);
     }
 
     if (typeof req.query.status === 'string' && req.query.status.trim()) {
-      sql += ' AND a.status = ?';
-      params.push(req.query.status.trim());
+      query = query.eq('status', req.query.status.trim());
     }
 
     if (typeof req.query.type === 'string' && req.query.type.trim()) {
-      sql += ' AND a.type = ?';
-      params.push(req.query.type.trim());
+      query = query.eq('type', req.query.type.trim());
     }
 
-    sql += ' ORDER BY a.submitted_at DESC';
+    const { data: applications, error } = await query;
 
-    const applications = await db.all(sql, params);
+    if (error) throw error;
+
     res.json(applications || []);
   } catch (error) {
     console.error('Get applications error:', error);
@@ -73,12 +70,14 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
     let studentId = req.body.studentId || req.body.student_id || null;
 
     if (user?.role === 'student') {
-      const student = await db.get(
-        'SELECT id FROM students WHERE user_id = ? AND college_id = ?',
-        [user.userId, collegeId]
-      );
+      const { data: student, error: studentError } = await db
+        .from('students')
+        .select('id')
+        .eq('user_id', user.userId)
+        .eq('college_id', collegeId)
+        .single();
 
-      if (!student) {
+      if (studentError || !student) {
         res.status(404).json({ error: 'Student record not found for current user' });
         return;
       }
@@ -91,36 +90,43 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const studentExists = await db.get(
-      'SELECT id FROM students WHERE id = ? AND college_id = ?',
-      [studentId, collegeId]
-    );
+    const { data: studentExists, error: studentExistsError } = await db
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!studentExists) {
+    if (studentExistsError || !studentExists) {
       res.status(404).json({ error: 'Student not found for this college' });
       return;
     }
 
     const applicationId = uuidv4();
-    await db.run(
-      `INSERT INTO applications (
-        id, college_id, student_id, type, title, description, status, urgency
-      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
-      [
-        applicationId,
-        collegeId,
-        studentId,
-        req.body.type || 'other',
+    const { error: insertError } = await db.from('applications').insert([
+      {
+        id: applicationId,
+        college_id: collegeId,
+        student_id: studentId,
+        type: req.body.type || 'other',
         title,
         description,
-        req.body.urgency || 'medium',
-      ]
-    );
+        status: 'pending',
+        urgency: req.body.urgency || 'medium',
+      },
+    ]);
 
-    const created = await db.get(
-      'SELECT * FROM applications WHERE id = ? AND college_id = ?',
-      [applicationId, collegeId]
-    );
+    if (insertError) throw insertError;
+
+    const { data: created, error: fetchError } = await db
+      .from('applications')
+      .select('*')
+      .eq('id', applicationId)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     res.status(201).json(created);
   } catch (error) {
     console.error('Create application error:', error);
@@ -139,27 +145,39 @@ router.patch('/:id/review', authenticate, authorize('admin', 'warden'), async (r
       return;
     }
 
-    const existing = await db.get(
-      'SELECT * FROM applications WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    const { data: existing, error: fetchError } = await db
+      .from('applications')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!existing) {
+    if (fetchError || !existing) {
       res.status(404).json({ error: 'Application not found' });
       return;
     }
 
-    await db.run(
-      `UPDATE applications
-       SET status = ?, reviewed_at = datetime('now'), reviewed_by = ?
-       WHERE id = ? AND college_id = ?`,
-      [status, req.user?.userId, req.params.id, collegeId]
-    );
+    const { error: updateError } = await db
+      .from('applications')
+      .update({
+        status,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: req.user?.userId,
+      })
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId);
 
-    const updated = await db.get(
-      'SELECT * FROM applications WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    if (updateError) throw updateError;
+
+    const { data: updated, error: refetchError } = await db
+      .from('applications')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (refetchError) throw refetchError;
+
     res.json(updated);
   } catch (error) {
     console.error('Review application error:', error);

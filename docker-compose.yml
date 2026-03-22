@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: hostel-backend-dev
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      SUPABASE_URL: ${SUPABASE_URL:-https://your-project.supabase.co}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-your-key}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-min-32-chars-long-for-testing}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:3001}
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/dist:/app/dist
+    networks:
+      - hostel-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (r) => {if(r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    command: npm run dev
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: hostel-frontend-dev
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://your-project.supabase.co}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-your-key}
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/components:/app/components
+      - /app/node_modules
+    networks:
+      - hostel-network
+    restart: unless-stopped
+    command: npm run dev
+
+networks:
+  hostel-network:
+    driver: bridge
+
+volumes:
+  backend-dist:
+  frontend-node:

@@ -1,33 +1,106 @@
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { log } from '../utils/logger.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '../../hostel.db');
+let supabaseClient: SupabaseClient | null = null;
 
-let db: Database | null = null;
+/**
+ * Initialize Supabase Client
+ * Connects to Supabase PostgreSQL database with service role key
+ */
+export async function initDb(): Promise<SupabaseClient> {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
 
-export async function initDb(): Promise<Database> {
-  if (db) return db;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  db = await open({
-    filename: dbPath,
-    driver: sqlite3.Database,
+  if (!supabaseUrl || !supabaseKey) {
+    log.fatal('Supabase configuration missing', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey,
+    });
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required');
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
   });
 
-  await db.exec('PRAGMA foreign_keys = ON');
-  return db;
-}
+  // Test connection by querying colleges table
+  try {
+    const { count, error } = await supabaseClient
+      .from('colleges')
+      .select('id', { count: 'exact', head: true });
 
-export async function getDb(): Promise<Database> {
-  if (!db) return initDb();
-  return db;
-}
+    if (error) {
+      log.fatal('Failed to connect to Supabase', error);
+      throw error;
+    }
 
-export async function closeDb(): Promise<void> {
-  if (db) {
-    await db.close();
-    db = null;
+    log.info('Connected to Supabase successfully', {
+      url: supabaseUrl.substring(0, 30) + '...',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    log.fatal('Supabase connection test failed', error);
+    throw error;
   }
+
+  return supabaseClient;
 }
+
+/**
+ * Get Supabase client instance
+ */
+export async function getDb(): Promise<SupabaseClient> {
+  if (!supabaseClient) {
+    return initDb();
+  }
+  return supabaseClient;
+}
+
+/**
+ * Close Supabase connection (no-op, but kept for compatibility)
+ */
+export async function closeDb(): Promise<void> {
+  log.info('Supabase connection closed');
+  supabaseClient = null;
+}
+
+/**
+ * Query helper for Supabase
+ */
+export async function queryDb(table: string, options: any = {}) {
+  const db = await getDb();
+  let query = db.from(table).select(options.select || '*');
+
+  if (options.eq) {
+    Object.entries(options.eq).forEach(([key, value]) => {
+      query = (query as any).eq(key, value);
+    });
+  }
+
+  if (options.limit) {
+    query = (query as any).limit(options.limit);
+  }
+
+  if (options.order) {
+    query = (query as any).order(options.order.column, { ascending: options.order.ascending ?? true });
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    log.error(`Query failed on ${table}`, error);
+    throw error;
+  }
+
+  return data;
+}
+
+export default { initDb, getDb, closeDb };
+

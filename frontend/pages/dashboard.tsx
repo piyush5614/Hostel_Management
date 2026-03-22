@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth-store';
 import { StatCard } from '../components/dashboard/stat-card';
 import { OccupancyChart } from '../components/dashboard/occupancy-chart';
@@ -9,11 +10,12 @@ import { ErrorBoundary } from '../components/error-boundary/error-boundary';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Building2, Users, Calendar, AlertTriangle, UserCheck, Clock, Star, Sparkles, Zap, Heart, ListChecks, BarChart3 } from 'lucide-react';
-import { getDashboardStats, getRecentActivities, getLinkedStudent, getLinkedStaff, getLinkedStudentId, getLinkedStaffId, mockAttendance, mockLeaveRequests, mockStudents, mockRooms, mockBeds, mockStaffTasks, mockApplications } from '../store/mock-data';
+import { getDashboardStats, getRecentActivities, getLinkedStudentId, getLinkedStaffId, mockAttendance, mockLeaveRequests, mockStudents, mockRooms, mockBeds, mockStaffTasks, mockApplications } from '../store/mock-data';
 import { useDataRefresh } from '../utils/use-data-refresh';
 import { EVENTS } from '../utils/event-bus';
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const userRole = user?.role || 'student';
   const refreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED, EVENTS.LEAVE_UPDATED, EVENTS.TASK_UPDATED, EVENTS.ATTENDANCE_UPDATED, EVENTS.ROOM_UPDATED, EVENTS.STAFF_UPDATED]);
@@ -78,12 +80,12 @@ export function DashboardPage() {
               <Sparkles className="h-8 w-8 text-white animate-pulse" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
-              <p className="text-primary-100 text-lg">Welcome back, {user?.name}! ✨</p>
+              <h1 className="text-4xl font-bold mb-2">{t('dash.title')}</h1>
+              <p className="text-primary-100 text-lg">{t('dash.welcome')}, {user?.name}! {t('dash.sparkles')}</p>
             </div>
           </div>
           <div className="text-sm text-primary-200 font-medium bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/20">
-            Last updated: {new Date().toLocaleString()}
+            {t('dash.lastUpdated')}: {new Date().toLocaleString()}
           </div>
         </div>
       </div>
@@ -93,10 +95,10 @@ export function DashboardPage() {
         <>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <StatCard
-              title="Total Students"
+              title={t('dash.totalStudents')}
               value={stats.totalStudents}
               icon={Users}
-              description="Registered students"
+              description={t('dash.registeredStudents')}
               trend={{
                 value: 2,
                 isPositive: true,
@@ -104,17 +106,17 @@ export function DashboardPage() {
               className="bg-gradient-to-br from-primary-50 via-primary-100 to-primary-200 dark:from-primary-900/20 dark:via-primary-800/20 dark:to-primary-700/20 border-2 border-primary-200 dark:border-primary-800"
             />
             <StatCard
-              title="Present Today"
+              title={t('dash.presentToday')}
               value={stats.presentStudents}
               icon={UserCheck}
-              description={`${stats.onLeaveStudents} on leave`}
+              description={`${stats.onLeaveStudents} ${t('dash.onLeave')}`}
               className="bg-gradient-to-br from-success-50 via-success-100 to-success-200 dark:from-success-900/20 dark:via-success-800/20 dark:to-success-700/20 border-2 border-success-200 dark:border-success-800"
             />
             <StatCard
-              title="Room Occupancy"
+              title={t('dash.roomOccupancy')}
               value={`${stats.occupiedRooms}/${stats.totalRooms}`}
               icon={Building2}
-              description="Occupied rooms"
+              description={t('dash.occupiedRooms')}
               trend={{
                 value: 5,
                 isPositive: true,
@@ -122,10 +124,10 @@ export function DashboardPage() {
               className="bg-gradient-to-br from-secondary-50 via-secondary-100 to-secondary-200 dark:from-secondary-900/20 dark:via-secondary-800/20 dark:to-secondary-700/20 border-2 border-secondary-200 dark:border-secondary-800"
             />
             <StatCard
-              title="Pending Requests"
+              title={t('dash.pendingRequests')}
               value={stats.pendingApplications + stats.pendingMaintenanceRequests}
               icon={Clock}
-              description="Applications & Maintenance"
+              description={t('dash.applicationsAndMaintenance')}
               className="bg-gradient-to-br from-warning-50 via-warning-100 to-warning-200 dark:from-warning-900/20 dark:via-warning-800/20 dark:to-warning-700/20 border-2 border-warning-200 dark:border-warning-800"
             />
           </div>
@@ -136,20 +138,26 @@ export function DashboardPage() {
               available={stats.availableRooms}
               maintenance={stats.maintenanceRooms}
             />
-            <RecentActivities activities={stats.recentActivities} />
+            <RecentActivities activities={stats.recentActivities.map(activity => ({
+              id: activity.id,
+              action: activity.type,
+              user: activity.userName,
+              timestamp: activity.timestamp,
+              details: activity.description
+            }))} />
             <div className="space-y-6">
               <StatCard
-                title="Today's Visitors"
+                title={t('dash.todayVisitors')}
                 value={stats.todayVisitors}
                 icon={Users}
-                description="Visitor entries"
+                description={t('dash.visitorEntries')}
                 className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 border-2 border-primary-200 dark:border-primary-800"
               />
               <StatCard
-                title="Active Staff"
+                title={t('dash.activeStaff')}
                 value={stats.activeStaff}
                 icon={UserCheck}
-                description="On duty today"
+                description={t('dash.staffMembers')}
                 className="bg-gradient-to-br from-success-50 to-success-100 dark:from-success-900/20 dark:to-success-800/20 border-2 border-success-200 dark:border-success-800"
               />
             </div>
@@ -161,17 +169,17 @@ export function DashboardPage() {
               <CardContent className="p-6">
                 <h3 className="font-bold mb-4 flex items-center space-x-2">
                   <Zap className="h-5 w-5 text-primary-600" />
-                  <span>Quick Actions</span>
+                  <span>{t('common.actions')}</span>
                 </h3>
                 <div className="space-y-3">
                   <button className="w-full text-left text-sm text-primary-600 hover:text-primary-700 hover:underline font-semibold transition-all duration-200 hover:scale-105">
-                    📝 Mark Attendance
+                    📝 {t('attendance.markAttendance')}
                   </button>
                   <button className="w-full text-left text-sm text-primary-600 hover:text-primary-700 hover:underline font-semibold transition-all duration-200 hover:scale-105">
-                    👥 Add New Student
+                    👥 {t('students.addStudent')}
                   </button>
                   <button className="w-full text-left text-sm text-primary-600 hover:text-primary-700 hover:underline font-semibold transition-all duration-200 hover:scale-105">
-                    🔧 Create Maintenance Request
+                    🔧 {t('common.details')}
                   </button>
                 </div>
               </CardContent>
@@ -181,14 +189,14 @@ export function DashboardPage() {
               <CardContent className="p-6">
                 <h3 className="font-bold mb-4 flex items-center space-x-2">
                   <AlertTriangle className="h-5 w-5 text-warning-600" />
-                  <span>Pending Approvals</span>
+                  <span>{t('dash.pendingRequests')}</span>
                 </h3>
                 <div className="space-y-3">
                   <div className="text-sm font-semibold">
-                    <span className="text-2xl font-bold text-warning-700">{stats.pendingApplications}</span> Applications
+                    <span className="text-2xl font-bold text-warning-700">{stats.pendingApplications}</span> {t('common.actions')}
                   </div>
                   <div className="text-sm font-semibold">
-                    <span className="text-2xl font-bold text-warning-700">{stats.pendingMaintenanceRequests}</span> Maintenance
+                    <span className="text-2xl font-bold text-warning-700">{stats.pendingMaintenanceRequests}</span> {t('common.details')}
                   </div>
                 </div>
               </CardContent>
@@ -198,17 +206,17 @@ export function DashboardPage() {
               <CardContent className="p-6">
                 <h3 className="font-bold mb-4 flex items-center space-x-2">
                   <Building2 className="h-5 w-5 text-success-600" />
-                  <span>Room Status</span>
+                  <span>{t('rooms.title')}</span>
                 </h3>
                 <div className="space-y-3">
                   <div className="text-sm font-semibold flex items-center space-x-2">
                     <span className="text-2xl font-bold text-success-700">{stats.availableRooms}</span> 
-                    <span>Available</span>
+                    <span>{t('rooms.available')}</span>
                     <Heart className="h-4 w-4 text-success-500" />
                   </div>
                   <div className="text-sm font-semibold flex items-center space-x-2">
                     <span className="text-2xl font-bold text-warning-700">{stats.maintenanceRooms}</span> 
-                    <span>Maintenance</span>
+                    <span>{t('rooms.maintenance')}</span>
                   </div>
                 </div>
               </CardContent>
@@ -218,14 +226,14 @@ export function DashboardPage() {
               <CardContent className="p-6">
                 <h3 className="font-bold mb-4 flex items-center space-x-2">
                   <Star className="h-5 w-5 text-secondary-600" />
-                  <span>System Health</span>
+                  <span>{t('common.status')}</span>
                 </h3>
                 <div className="space-y-3">
                   <div className="text-sm text-success-600 font-bold flex items-center space-x-1">
-                    <span>✅ All systems operational</span>
+                    <span>✅ {t('errors.success')}</span>
                   </div>
                   <div className="text-sm text-muted-foreground font-semibold">
-                    🔄 Last backup: {new Date().toLocaleDateString()}
+                    🔄 {t('dash.lastUpdated')}: {new Date().toLocaleDateString()}
                   </div>
                 </div>
               </CardContent>
@@ -239,31 +247,31 @@ export function DashboardPage() {
         <>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title="My Tasks"
+              title={t('dash.tasks')}
               value={staffData.totalTasks}
               icon={ListChecks}
-              description="Total assigned tasks"
+              description={t('dash.tasksAssigned')}
               className="bg-gradient-to-br from-primary-50 via-primary-100 to-primary-200 dark:from-primary-900/20 dark:via-primary-800/20 dark:to-primary-700/20 border-2 border-primary-200 dark:border-primary-800"
             />
             <StatCard
-              title="Pending"
+              title={t('dash.pending')}
               value={staffData.pendingTasks}
               icon={Clock}
-              description="Tasks awaiting start"
+              description={t('dash.pendingtasks')}
               className="bg-gradient-to-br from-warning-50 via-warning-100 to-warning-200 dark:from-warning-900/20 dark:via-warning-800/20 dark:to-warning-700/20 border-2 border-warning-200 dark:border-warning-800"
             />
             <StatCard
-              title="In Progress"
+              title={t('leave.leaveRequest')}
               value={staffData.inProgressTasks}
               icon={BarChart3}
-              description="Currently working on"
+              description={t('attendance.duration')}
               className="bg-gradient-to-br from-secondary-50 via-secondary-100 to-secondary-200 dark:from-secondary-900/20 dark:via-secondary-800/20 dark:to-secondary-700/20 border-2 border-secondary-200 dark:border-secondary-800"
             />
             <StatCard
-              title="Completed"
+              title={t('common.actions')}
               value={staffData.completedTasks}
               icon={UserCheck}
-              description="Finished tasks"
+              description={t('dash.completed')}
               className="bg-gradient-to-br from-success-50 via-success-100 to-success-200 dark:from-success-900/20 dark:via-success-800/20 dark:to-success-700/20 border-2 border-success-200 dark:border-success-800"
             />
           </div>
@@ -274,21 +282,21 @@ export function DashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 text-xl">
                   <Zap className="h-6 w-6 text-primary-600" />
-                  <span>Quick Actions</span>
+                  <span>{t('common.actions')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button className="w-full h-12 bg-gradient-to-r from-primary-600 via-primary-700 to-primary-800 hover:from-primary-700 hover:via-primary-800 hover:to-primary-900 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300" onClick={() => window.location.href = '/staff-tasks'}>
                   <ListChecks className="mr-2 h-5 w-5" />
-                  View My Tasks
+                  {t('staff.staffList')}
                 </Button>
                 <Button variant="outline" className="w-full h-12 bg-gradient-to-r from-white to-gray-50 hover:from-gray-50 hover:to-gray-100 border-2 border-primary-200 hover:border-primary-300 hover:scale-[1.02] transition-all duration-300 shadow-lg hover:shadow-xl" onClick={() => window.location.href = '/attendance'}>
                   <Calendar className="mr-2 h-5 w-5" />
-                  Mark Attendance
+                  {t('attendance.markAttendance')}
                 </Button>
                 <Button variant="outline" className="w-full h-12 bg-gradient-to-r from-white to-gray-50 hover:from-gray-50 hover:to-gray-100 border-2 border-secondary-200 hover:border-secondary-300 hover:scale-[1.02] transition-all duration-300 shadow-lg hover:shadow-xl" onClick={() => window.location.href = '/staff/students'}>
                   <Users className="mr-2 h-5 w-5" />
-                  View Students
+                  {t('students.studentList')}
                 </Button>
               </CardContent>
             </Card>
@@ -298,13 +306,13 @@ export function DashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 text-xl">
                   <BarChart3 className="h-6 w-6 text-secondary-600" />
-                  <span>Task Progress</span>
+                  <span>{t('dash.pending')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Completion Rate</span>
+                    <span className="text-sm font-medium">{t('leave.reason')}</span>
                     <span className="text-sm font-bold text-success-600">{staffData.totalTasks > 0 ? Math.round((staffData.completedTasks / staffData.totalTasks) * 100) : 0}%</span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
@@ -314,15 +322,15 @@ export function DashboardPage() {
                 <div className="grid grid-cols-3 gap-3 pt-2">
                   <div className="rounded-xl border-2 border-warning-200 bg-warning-50 dark:bg-warning-900/20 p-3 text-center">
                     <div className="text-2xl font-bold text-warning-700">{staffData.pendingTasks}</div>
-                    <div className="text-xs font-medium text-warning-600">Pending</div>
+                    <div className="text-xs font-medium text-warning-600">{t('dash.pending')}</div>
                   </div>
                   <div className="rounded-xl border-2 border-secondary-200 bg-secondary-50 dark:bg-secondary-900/20 p-3 text-center">
                     <div className="text-2xl font-bold text-secondary-700">{staffData.inProgressTasks}</div>
-                    <div className="text-xs font-medium text-secondary-600">Active</div>
+                    <div className="text-xs font-medium text-secondary-600">{t('attendance.morning')}</div>
                   </div>
                   <div className="rounded-xl border-2 border-success-200 bg-success-50 dark:bg-success-900/20 p-3 text-center">
                     <div className="text-2xl font-bold text-success-700">{staffData.completedTasks}</div>
-                    <div className="text-xs font-medium text-success-600">Done</div>
+                    <div className="text-xs font-medium text-success-600">{t('dash.completed')}</div>
                   </div>
                 </div>
               </CardContent>

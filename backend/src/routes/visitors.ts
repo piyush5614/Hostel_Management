@@ -11,29 +11,32 @@ router.get('/', authenticate, authorize('admin', 'warden', 'staff'), async (req:
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
 
-    let sql = `
-      SELECT v.*,
-             s.enrollment_number,
-             st.employee_id
-      FROM visitors v
-      LEFT JOIN students s ON s.id = v.student_id
-      LEFT JOIN staff st ON st.id = v.staff_id
-      WHERE v.college_id = ?
-    `;
-    const params: any[] = [collegeId];
+    let query = db
+      .from('visitors')
+      .select(
+        `*,
+         students(enrollment_number),
+         staff(employee_id)`
+      )
+      .eq('college_id', collegeId)
+      .order('check_in_time', { ascending: false });
 
     if (typeof req.query.active === 'string' && req.query.active === 'true') {
-      sql += ' AND v.check_out_time IS NULL';
+      query = query.is('check_out_time', null);
     }
 
     if (typeof req.query.date === 'string' && req.query.date.trim()) {
-      sql += " AND date(v.check_in_time) = date(?)";
-      params.push(req.query.date.trim());
+      // For date filtering, we'll need to handle this after fetching
+      // since Supabase doesn't have a direct date() function for comparisons
+      const dateStr = req.query.date.trim();
+      query = query.gte('check_in_time', `${dateStr}T00:00:00`)
+        .lte('check_in_time', `${dateStr}T23:59:59`);
     }
 
-    sql += ' ORDER BY v.check_in_time DESC';
+    const { data: visitors, error } = await query;
 
-    const visitors = await db.all(sql, params);
+    if (error) throw error;
+
     res.json(visitors || []);
   } catch (error) {
     console.error('Get visitors error:', error);
@@ -62,44 +65,63 @@ router.post('/', authenticate, authorize('admin', 'warden', 'staff'), async (req
     }
 
     if (studentId) {
-      const student = await db.get('SELECT id FROM students WHERE id = ? AND college_id = ?', [studentId, collegeId]);
-      if (!student) {
+      const { data: student, error: studentError } = await db
+        .from('students')
+        .select('id')
+        .eq('id', studentId)
+        .eq('college_id', collegeId)
+        .single();
+
+      if (studentError || !student) {
         res.status(404).json({ error: 'Student not found for this college' });
         return;
       }
     }
 
     if (staffId) {
-      const staff = await db.get('SELECT id FROM staff WHERE id = ? AND college_id = ?', [staffId, collegeId]);
-      if (!staff) {
+      const { data: staff, error: staffError } = await db
+        .from('staff')
+        .select('id')
+        .eq('id', staffId)
+        .eq('college_id', collegeId)
+        .single();
+
+      if (staffError || !staff) {
         res.status(404).json({ error: 'Staff not found for this college' });
         return;
       }
     }
 
     const visitorId = uuidv4();
-    await db.run(
-      `INSERT INTO visitors (
-        id, college_id, name, contact_number, purpose, student_id, staff_id,
-        check_in_time, id_proof_type, id_proof_number, vehicle_number, photo, approved_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?)`,
-      [
-        visitorId,
-        collegeId,
+    const { error: insertError } = await db.from('visitors').insert([
+      {
+        id: visitorId,
+        college_id: collegeId,
         name,
-        contactNumber,
+        contact_number: contactNumber,
         purpose,
-        studentId,
-        staffId,
-        idProofType,
-        idProofNumber,
-        vehicleNumber,
+        student_id: studentId,
+        staff_id: staffId,
+        check_in_time: new Date().toISOString(),
+        id_proof_type: idProofType,
+        id_proof_number: idProofNumber,
+        vehicle_number: vehicleNumber,
         photo,
-        req.user?.userId,
-      ]
-    );
+        approved_by: req.user?.userId,
+      },
+    ]);
 
-    const created = await db.get('SELECT * FROM visitors WHERE id = ? AND college_id = ?', [visitorId, collegeId]);
+    if (insertError) throw insertError;
+
+    const { data: created, error: fetchError } = await db
+      .from('visitors')
+      .select('*')
+      .eq('id', visitorId)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     res.status(201).json(created);
   } catch (error) {
     console.error('Create visitor error:', error);
@@ -112,12 +134,14 @@ router.patch('/:id/checkout', authenticate, authorize('admin', 'warden', 'staff'
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
 
-    const existing = await db.get(
-      'SELECT * FROM visitors WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    const { data: existing, error: fetchError } = await db
+      .from('visitors')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!existing) {
+    if (fetchError || !existing) {
       res.status(404).json({ error: 'Visitor not found' });
       return;
     }
@@ -127,12 +151,23 @@ router.patch('/:id/checkout', authenticate, authorize('admin', 'warden', 'staff'
       return;
     }
 
-    await db.run(
-      "UPDATE visitors SET check_out_time = datetime('now') WHERE id = ? AND college_id = ?",
-      [req.params.id, collegeId]
-    );
+    const { error: updateError } = await db
+      .from('visitors')
+      .update({ check_out_time: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId);
 
-    const updated = await db.get('SELECT * FROM visitors WHERE id = ? AND college_id = ?', [req.params.id, collegeId]);
+    if (updateError) throw updateError;
+
+    const { data: updated, error: refetchError } = await db
+      .from('visitors')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (refetchError) throw refetchError;
+
     res.json(updated);
   } catch (error) {
     console.error('Visitor checkout error:', error);

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
 export function VisitorManagementPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);

@@ -12,52 +12,45 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
-    let sql = `
-      SELECT
-        a.*,
-        u.name AS student_name,
-        s.enrollment_number,
-        s.room_id
-      FROM attendance a
-      LEFT JOIN students s ON s.id = a.student_id
-      LEFT JOIN users u ON u.id = s.user_id
-      WHERE a.college_id = ?
-    `;
-    const params: any[] = [collegeId];
+    let query = db
+      .from('attendance')
+      .select('*, students(enrollment_number, room_id, user_id), users:students(user_id).name')
+      .eq('college_id', collegeId)
+      .order('date', { ascending: false })
+      .order('recorded_at', { ascending: false });
 
     if (user?.role === 'student') {
-      const student = await db.get(
-        'SELECT id FROM students WHERE user_id = ? AND college_id = ?',
-        [user.userId, collegeId]
-      );
+      const { data: studentData, error: studentError } = await db
+        .from('students')
+        .select('id')
+        .eq('user_id', user.userId)
+        .eq('college_id', collegeId)
+        .single();
 
-      if (!student) {
+      if (studentError || !studentData) {
         res.json([]);
         return;
       }
 
-      sql += ' AND a.student_id = ?';
-      params.push(student.id);
+      query = query.eq('student_id', studentData.id);
     }
 
     if (typeof req.query.date === 'string' && req.query.date.trim()) {
-      sql += ' AND a.date = ?';
-      params.push(req.query.date.trim());
+      query = query.eq('date', req.query.date.trim());
     }
 
     if (typeof req.query.studentId === 'string' && req.query.studentId.trim()) {
-      sql += ' AND a.student_id = ?';
-      params.push(req.query.studentId.trim());
+      query = query.eq('student_id', req.query.studentId.trim());
     }
 
     if (typeof req.query.roomId === 'string' && req.query.roomId.trim()) {
-      sql += ' AND s.room_id = ?';
-      params.push(req.query.roomId.trim());
+      query = query.eq('students.room_id', req.query.roomId.trim());
     }
 
-    sql += ' ORDER BY a.date DESC, a.recorded_at DESC';
+    const { data: records, error } = await query;
 
-    const records = await db.all(sql, params);
+    if (error) throw error;
+
     res.json(records || []);
   } catch (error) {
     console.error('Get attendance error:', error);
@@ -84,50 +77,74 @@ router.post('/', authenticate, authorize('admin', 'warden', 'staff'), async (req
       return;
     }
 
-    const student = await db.get(
-      'SELECT id FROM students WHERE id = ? AND college_id = ?',
-      [studentId, collegeId]
-    );
+    const { data: student, error: studentError } = await db
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!student) {
+    if (studentError || !student) {
       res.status(404).json({ error: 'Student not found for this college' });
       return;
     }
 
-    const existing = await db.get(
-      'SELECT id FROM attendance WHERE college_id = ? AND student_id = ? AND date = ?',
-      [collegeId, studentId, date]
-    );
+    const { data: existing, error: existingError } = await db
+      .from('attendance')
+      .select('id')
+      .eq('college_id', collegeId)
+      .eq('student_id', studentId)
+      .eq('date', date)
+      .single();
 
-    let attendanceId = existing?.id;
+    let attendanceId: string;
+    let isUpdate = false;
 
-    if (existing) {
-      await db.run(
-        `UPDATE attendance
-         SET morning_status = ?,
-             evening_status = ?,
-             remarks = ?,
-             recorded_by = ?,
-             recorded_at = datetime('now')
-         WHERE id = ? AND college_id = ?`,
-        [morningStatus, eveningStatus, remarks, user?.userId, attendanceId, collegeId]
-      );
-    } else {
+    if (existingError || !existing) {
       attendanceId = uuidv4();
-      await db.run(
-        `INSERT INTO attendance (
-          id, college_id, student_id, date, morning_status, evening_status, remarks, recorded_by, recorded_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [attendanceId, collegeId, studentId, date, morningStatus, eveningStatus, remarks, user?.userId]
-      );
+      const { error: insertError } = await db.from('attendance').insert([
+        {
+          id: attendanceId,
+          college_id: collegeId,
+          student_id: studentId,
+          date,
+          morning_status: morningStatus,
+          evening_status: eveningStatus,
+          remarks,
+          recorded_by: user?.userId,
+          recorded_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (insertError) throw insertError;
+    } else {
+      attendanceId = existing.id;
+      isUpdate = true;
+      const { error: updateError } = await db
+        .from('attendance')
+        .update({
+          morning_status: morningStatus,
+          evening_status: eveningStatus,
+          remarks,
+          recorded_by: user?.userId,
+          recorded_at: new Date().toISOString(),
+        })
+        .eq('id', attendanceId)
+        .eq('college_id', collegeId);
+
+      if (updateError) throw updateError;
     }
 
-    const saved = await db.get(
-      'SELECT * FROM attendance WHERE id = ? AND college_id = ?',
-      [attendanceId, collegeId]
-    );
+    const { data: saved, error: fetchError } = await db
+      .from('attendance')
+      .select('*')
+      .eq('id', attendanceId)
+      .eq('college_id', collegeId)
+      .single();
 
-    res.status(existing ? 200 : 201).json(saved);
+    if (fetchError) throw fetchError;
+
+    res.status(isUpdate ? 200 : 201).json(saved);
   } catch (error) {
     console.error('Save attendance error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -146,8 +163,6 @@ router.post('/bulk-upsert', authenticate, authorize('admin', 'warden', 'staff'),
       return;
     }
 
-    await db.exec('BEGIN TRANSACTION');
-
     try {
       for (const record of records) {
         const studentId = record.studentId || record.student_id;
@@ -160,33 +175,66 @@ router.post('/bulk-upsert', authenticate, authorize('admin', 'warden', 'staff'),
           throw new Error('Each record must contain studentId, date, morningStatus and eveningStatus');
         }
 
-        const student = await db.get(
-          'SELECT id FROM students WHERE id = ? AND college_id = ?',
-          [studentId, collegeId]
-        );
+        const { data: student, error: studentError } = await db
+          .from('students')
+          .select('id')
+          .eq('id', studentId)
+          .eq('college_id', collegeId)
+          .single();
 
-        if (!student) {
+        if (studentError || !student) {
           throw new Error(`Student ${studentId} not found for this college`);
         }
 
-        await db.run(
-          `INSERT INTO attendance (
-            id, college_id, student_id, date, morning_status, evening_status, remarks, recorded_by, recorded_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-          ON CONFLICT(student_id, date) DO UPDATE SET
-            morning_status = excluded.morning_status,
-            evening_status = excluded.evening_status,
-            remarks = excluded.remarks,
-            recorded_by = excluded.recorded_by,
-            recorded_at = datetime('now')`,
-          [uuidv4(), collegeId, studentId, date, morningStatus, eveningStatus, remarks, user?.userId]
-        );
-      }
+        // Try to find existing record
+        const { data: existing, error: existingError } = await db
+          .from('attendance')
+          .select('id')
+          .eq('college_id', collegeId)
+          .eq('student_id', studentId)
+          .eq('date', date)
+          .single();
 
-      await db.exec('COMMIT');
-    } catch (err) {
-      await db.exec('ROLLBACK');
-      throw err;
+        if (existingError && existingError.code !== 'PGRST116') {
+          throw existingError;
+        }
+
+        const attendanceId = existing?.id || uuidv4();
+
+        if (existing) {
+          const { error: updateError } = await db
+            .from('attendance')
+            .update({
+              morning_status: morningStatus,
+              evening_status: eveningStatus,
+              remarks,
+              recorded_by: user?.userId,
+              recorded_at: new Date().toISOString(),
+            })
+            .eq('id', attendanceId)
+            .eq('college_id', collegeId);
+
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await db.from('attendance').insert([
+            {
+              id: attendanceId,
+              college_id: collegeId,
+              student_id: studentId,
+              date,
+              morning_status: morningStatus,
+              evening_status: eveningStatus,
+              remarks,
+              recorded_by: user?.userId,
+              recorded_at: new Date().toISOString(),
+            },
+          ]);
+
+          if (insertError) throw insertError;
+        }
+      }
+    } catch (innerError) {
+      throw innerError;
     }
 
     res.json({ success: true, count: records.length });

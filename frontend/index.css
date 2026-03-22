@@ -189,6 +189,18 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   }
+
+  html[data-ui-mode='app'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html[data-ui-mode='app'] body {
+    overscroll-behavior-y: contain;
+  }
+
+  html[data-ui-mode='app'] #root {
+    min-height: 100dvh;
+  }
   
   /* Enhanced scrollbar styling */
   ::-webkit-scrollbar {

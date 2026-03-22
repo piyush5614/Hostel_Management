@@ -379,7 +379,7 @@ export interface SystemSettings {
   };
   display: {
     theme: 'light' | 'dark' | 'auto';
-    language: 'en' | 'hi' | 'ta' | 'te';
+    language: 'en' | 'hi' | 'mr';
     dateFormat: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
     timeFormat: '12h' | '24h';
     timezone: string;

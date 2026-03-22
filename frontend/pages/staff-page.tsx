@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
@@ -19,6 +20,7 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../store/auth-store';
 
 export function StaffPage() {
+  const { t } = useTranslation();
   const user = useAuthStore(s => s.user);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [searchQuery, setSearchQuery] = useState('');

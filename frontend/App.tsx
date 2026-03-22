@@ -24,6 +24,7 @@ import { ParentApprovalPage } from './components/parent-approval/parent-approval
 import { TaskStartPage } from './pages/task-start-page';
 import { ErrorBoundary } from './components/error-boundary/error-boundary';
 import { useAuthStore } from './store/auth-store';
+import { LanguageProvider } from './lib/language-context';
 import { useEffect } from 'react';
 
 // Protected route component
@@ -76,54 +77,56 @@ function App() {
   }
   
   return (
-    <ErrorBoundary>
-    <BrowserRouter>
-      <Routes>
-        {/* Public route - Login page */}
-        <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
-        
-        {/* Public route - Parent approval page */}
-        <Route path="/approve/:approvalCode" element={<ParentApprovalPage />} />
-        
-        {/* Public route - Auto-login from email task notification */}
-        <Route path="/task-start" element={<TaskStartPage />} />
-        
-        {/* Protected routes - Main application */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <MainLayout user={user!} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="rooms" element={<RoomsPage />} />
-          <Route path="students" element={<StudentsPage />} />
-          <Route path="leave" element={<LeaveManagementPage />} />
-          <Route path="scan" element={<QRScannerPage />} />
-          <Route path="attendance" element={<AttendancePage />} />
-          <Route path="applications" element={<ApplicationsPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="events" element={<EventsPage />} />
-          <Route path="maintenance" element={<MaintenancePage />} />
-          <Route path="visitors" element={<VisitorManagementPage />} />
-          <Route path="messages" element={<MessagesPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="staff" element={<StaffPage />} />
-          <Route path="staff/dashboard" element={<StaffPage />} />
-          <Route path="staff/students" element={<StaffStudentView />} />
-          <Route path="staff-tasks" element={<StaffTasksPage />} />
-          <Route path="credentials" element={<CredentialManagementPage />} />
+    <LanguageProvider>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            {/* Public route - Login page */}
+            <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
+            
+            {/* Public route - Parent approval page */}
+            <Route path="/approve/:approvalCode" element={<ParentApprovalPage />} />
+            
+            {/* Public route - Auto-login from email task notification */}
+            <Route path="/task-start" element={<TaskStartPage />} />
+            
+            {/* Protected routes - Main application */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <MainLayout user={user!} onLogout={logout} />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="rooms" element={<RoomsPage />} />
+              <Route path="students" element={<StudentsPage />} />
+              <Route path="leave" element={<LeaveManagementPage />} />
+              <Route path="scan" element={<QRScannerPage />} />
+              <Route path="attendance" element={<AttendancePage />} />
+              <Route path="applications" element={<ApplicationsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="events" element={<EventsPage />} />
+              <Route path="maintenance" element={<MaintenancePage />} />
+              <Route path="visitors" element={<VisitorManagementPage />} />
+              <Route path="messages" element={<MessagesPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="staff" element={<StaffPage />} />
+              <Route path="staff/dashboard" element={<StaffPage />} />
+              <Route path="staff/students" element={<StaffStudentView />} />
+              <Route path="staff-tasks" element={<StaffTasksPage />} />
+              <Route path="credentials" element={<CredentialManagementPage />} />
 
-          {/* Catch-all route */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-    </ErrorBoundary>
+              {/* Catch-all route */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </LanguageProvider>
   );
 }
 

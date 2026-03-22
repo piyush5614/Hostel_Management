@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -37,6 +38,7 @@ import { useDataRefresh } from '../utils/use-data-refresh';
 import { EVENTS } from '../utils/event-bus';
 
 export function LeaveManagementPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const refreshKey = useDataRefresh([EVENTS.LEAVE_UPDATED, EVENTS.STAFF_LEAVE_UPDATED]);
 

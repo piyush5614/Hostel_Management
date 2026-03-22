@@ -20,7 +20,7 @@ export function Header({ user, onLogout }: HeaderProps) {
   };
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center border-b border-border bg-background px-4 lg:left-64">
+    <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center border-b border-border bg-background px-4 md:left-64">
       <div className="flex flex-1 items-center justify-between">
         <div className="flex items-center">
           <span className="hidden text-xl font-semibold md:block">
@@ -51,7 +51,6 @@ export function Header({ user, onLogout }: HeaderProps) {
               size="icon"
               onClick={() => {
                 setIsUserMenuOpen(!isUserMenuOpen);
-                setIsNotificationsOpen(false);
               }}
               aria-label="User menu"
               className="relative"

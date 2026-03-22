@@ -12,32 +12,28 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
-    let sql = `
-      SELECT mr.*, r.number AS room_number
-      FROM maintenance_requests mr
-      LEFT JOIN rooms r ON r.id = mr.room_id
-      WHERE mr.college_id = ?
-    `;
-    const params: any[] = [collegeId];
+    let query = db
+      .from('maintenance_requests')
+      .select('*, rooms(number)')
+      .eq('college_id', collegeId)
+      .order('created_at', { ascending: false });
 
     if (typeof req.query.status === 'string' && req.query.status.trim()) {
-      sql += ' AND mr.status = ?';
-      params.push(req.query.status.trim());
+      query = query.eq('status', req.query.status.trim());
     }
 
     if (typeof req.query.priority === 'string' && req.query.priority.trim()) {
-      sql += ' AND mr.priority = ?';
-      params.push(req.query.priority.trim());
+      query = query.eq('priority', req.query.priority.trim());
     }
 
     if (user?.role === 'student') {
-      sql += ' AND mr.requester_id = ?';
-      params.push(user.userId);
+      query = query.eq('requester_id', user.userId);
     }
 
-    sql += ' ORDER BY mr.created_at DESC';
+    const { data: requests, error } = await query;
 
-    const requests = await db.all(sql, params);
+    if (error) throw error;
+
     res.json(requests || []);
   } catch (error) {
     console.error('Get maintenance requests error:', error);
@@ -61,8 +57,14 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
 
     const roomId = req.body.roomId || req.body.room_id || null;
     if (roomId) {
-      const room = await db.get('SELECT id FROM rooms WHERE id = ? AND college_id = ?', [roomId, collegeId]);
-      if (!room) {
+      const { data: room, error: roomError } = await db
+        .from('rooms')
+        .select('id')
+        .eq('id', roomId)
+        .eq('college_id', collegeId)
+        .single();
+
+      if (roomError || !room) {
         res.status(404).json({ error: 'Room not found for this college' });
         return;
       }
@@ -73,17 +75,32 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
     const priority = req.body.priority || 'medium';
     const category = req.body.category || 'other';
 
-    await db.run(
-      `INSERT INTO maintenance_requests (
-        id, college_id, requester_id, requester_type, room_id, title, description, priority, status, category
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-      [requestId, collegeId, user?.userId, requesterType, roomId, title, description, priority, category]
-    );
+    const { error: insertError } = await db.from('maintenance_requests').insert([
+      {
+        id: requestId,
+        college_id: collegeId,
+        requester_id: user?.userId,
+        requester_type: requesterType,
+        room_id: roomId,
+        title,
+        description,
+        priority,
+        status: 'pending',
+        category,
+      },
+    ]);
 
-    const created = await db.get(
-      'SELECT * FROM maintenance_requests WHERE id = ? AND college_id = ?',
-      [requestId, collegeId]
-    );
+    if (insertError) throw insertError;
+
+    const { data: created, error: fetchError } = await db
+      .from('maintenance_requests')
+      .select('*')
+      .eq('id', requestId)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     res.status(201).json(created);
   } catch (error) {
     console.error('Create maintenance request error:', error);
@@ -97,12 +114,14 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
-    const existing = await db.get(
-      'SELECT * FROM maintenance_requests WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    const { data: existing, error: fetchError } = await db
+      .from('maintenance_requests')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!existing) {
+    if (fetchError || !existing) {
       res.status(404).json({ error: 'Maintenance request not found' });
       return;
     }
@@ -115,7 +134,7 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
       return;
     }
 
-    const updates: Array<{ column: string; value: any }> = [];
+    const updates: Record<string, any> = {};
     const map = [
       ['title', 'title'],
       ['description', 'description'],
@@ -129,28 +148,33 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
     ] as const;
 
     for (const [inputKey, column] of map) {
-      if (req.body[inputKey] !== undefined) {
-        updates.push({ column, value: req.body[inputKey] });
+      if (req.body[inputKey] !== undefined && !(column in updates)) {
+        updates[column] = req.body[inputKey];
       }
     }
 
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'No valid fields provided for update' });
       return;
     }
 
-    const setClause = updates.map((u) => `${u.column} = ?`).join(', ');
-    const values = updates.map((u) => u.value);
+    const { error: updateError } = await db
+      .from('maintenance_requests')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId);
 
-    await db.run(
-      `UPDATE maintenance_requests SET ${setClause} WHERE id = ? AND college_id = ?`,
-      [...values, req.params.id, collegeId]
-    );
+    if (updateError) throw updateError;
 
-    const updated = await db.get(
-      'SELECT * FROM maintenance_requests WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    const { data: updated, error: refetchError } = await db
+      .from('maintenance_requests')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (refetchError) throw refetchError;
+
     res.json(updated);
   } catch (error) {
     console.error('Update maintenance request error:', error);

@@ -12,43 +12,40 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
-    let sql = `
-      SELECT r.*, u.name AS student_name, s.enrollment_number
-      FROM reports r
-      LEFT JOIN students s ON s.id = r.student_id
-      LEFT JOIN users u ON u.id = s.user_id
-      WHERE r.college_id = ?
-    `;
-    const params: any[] = [collegeId];
+    let query = db
+      .from('reports')
+      .select('*, students(user_id, enrollment_number, users(name))')
+      .eq('college_id', collegeId)
+      .order('created_at', { ascending: false });
 
     if (user?.role === 'student') {
-      const student = await db.get(
-        'SELECT id FROM students WHERE user_id = ? AND college_id = ?',
-        [user.userId, collegeId]
-      );
+      const { data: student, error: studentError } = await db
+        .from('students')
+        .select('id')
+        .eq('user_id', user.userId)
+        .eq('college_id', collegeId)
+        .single();
 
-      if (!student) {
+      if (studentError || !student) {
         res.json([]);
         return;
       }
 
-      sql += ' AND r.student_id = ?';
-      params.push(student.id);
+      query = query.eq('student_id', student.id);
     }
 
     if (typeof req.query.status === 'string' && req.query.status.trim()) {
-      sql += ' AND r.status = ?';
-      params.push(req.query.status.trim());
+      query = query.eq('status', req.query.status.trim());
     }
 
     if (typeof req.query.priority === 'string' && req.query.priority.trim()) {
-      sql += ' AND r.priority = ?';
-      params.push(req.query.priority.trim());
+      query = query.eq('priority', req.query.priority.trim());
     }
 
-    sql += ' ORDER BY r.created_at DESC';
+    const { data: reports, error } = await query;
 
-    const reports = await db.all(sql, params);
+    if (error) throw error;
+
     res.json(reports || []);
   } catch (error) {
     console.error('Get reports error:', error);
@@ -73,12 +70,14 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
     let studentId = req.body.studentId || req.body.student_id || null;
 
     if (user?.role === 'student') {
-      const student = await db.get(
-        'SELECT id FROM students WHERE user_id = ? AND college_id = ?',
-        [user.userId, collegeId]
-      );
+      const { data: student, error: studentError } = await db
+        .from('students')
+        .select('id')
+        .eq('user_id', user.userId)
+        .eq('college_id', collegeId)
+        .single();
 
-      if (!student) {
+      if (studentError || !student) {
         res.status(404).json({ error: 'Student record not found for current user' });
         return;
       }
@@ -91,35 +90,45 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const studentExists = await db.get(
-      'SELECT id FROM students WHERE id = ? AND college_id = ?',
-      [studentId, collegeId]
-    );
+    const { data: studentExists, error: studentExistsError } = await db
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!studentExists) {
+    if (studentExistsError || !studentExists) {
       res.status(404).json({ error: 'Student not found for this college' });
       return;
     }
 
     const reportId = uuidv4();
-    await db.run(
-      `INSERT INTO reports (
-        id, college_id, student_id, type, title, description, priority, status, category, assigned_to
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      [
-        reportId,
-        collegeId,
-        studentId,
-        req.body.type || 'complaint',
+    const { error: insertError } = await db.from('reports').insert([
+      {
+        id: reportId,
+        college_id: collegeId,
+        student_id: studentId,
+        type: req.body.type || 'complaint',
         title,
         description,
-        req.body.priority || 'medium',
-        req.body.category || 'general',
-        req.body.assignedTo || req.body.assigned_to || null,
-      ]
-    );
+        priority: req.body.priority || 'medium',
+        status: 'pending',
+        category: req.body.category || 'general',
+        assigned_to: req.body.assignedTo || req.body.assigned_to || null,
+      },
+    ]);
 
-    const created = await db.get('SELECT * FROM reports WHERE id = ? AND college_id = ?', [reportId, collegeId]);
+    if (insertError) throw insertError;
+
+    const { data: created, error: fetchError } = await db
+      .from('reports')
+      .select('*')
+      .eq('id', reportId)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     res.status(201).json(created);
   } catch (error) {
     console.error('Create report error:', error);
@@ -132,17 +141,19 @@ router.patch('/:id', authenticate, authorize('admin', 'warden', 'staff'), async 
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
 
-    const existing = await db.get(
-      'SELECT * FROM reports WHERE id = ? AND college_id = ?',
-      [req.params.id, collegeId]
-    );
+    const { data: existing, error: fetchError } = await db
+      .from('reports')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
 
-    if (!existing) {
+    if (fetchError || !existing) {
       res.status(404).json({ error: 'Report not found' });
       return;
     }
 
-    const updates: Array<{ column: string; value: any }> = [];
+    const updates: Record<string, any> = {};
     const map = [
       ['type', 'type'],
       ['title', 'title'],
@@ -155,25 +166,33 @@ router.patch('/:id', authenticate, authorize('admin', 'warden', 'staff'), async 
     ] as const;
 
     for (const [inputKey, column] of map) {
-      if (req.body[inputKey] !== undefined) {
-        updates.push({ column, value: req.body[inputKey] });
+      if (req.body[inputKey] !== undefined && !(column in updates)) {
+        updates[column] = req.body[inputKey];
       }
     }
 
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'No valid fields provided for update' });
       return;
     }
 
-    const setClause = updates.map((u) => `${u.column} = ?`).join(', ');
-    const values = updates.map((u) => u.value);
+    const { error: updateError } = await db
+      .from('reports')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId);
 
-    await db.run(
-      `UPDATE reports SET ${setClause} WHERE id = ? AND college_id = ?`,
-      [...values, req.params.id, collegeId]
-    );
+    if (updateError) throw updateError;
 
-    const updated = await db.get('SELECT * FROM reports WHERE id = ? AND college_id = ?', [req.params.id, collegeId]);
+    const { data: updated, error: refetchError } = await db
+      .from('reports')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .single();
+
+    if (refetchError) throw refetchError;
+
     res.json(updated);
   } catch (error) {
     console.error('Update report error:', error);

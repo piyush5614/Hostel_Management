@@ -7,43 +7,32 @@ import { hashPassword } from '../utils/auth.js';
 
 const router = Router();
 
-const STUDENT_SELECT = `
-  SELECT
-    s.id,
-    s.college_id,
-    s.user_id,
-    u.name,
-    u.email,
-    s.enrollment_number,
-    s.course,
-    s.year,
-    s.gender,
-    s.date_of_birth,
-    s.contact_number,
-    s.address,
-    s.guardian_name,
-    s.guardian_contact,
-    s.emergency_contact,
-    s.medical_notes,
-    s.room_id,
-    s.bed_id,
-    COALESCE(s.profile_image, u.profile_image) AS profile_image,
-    s.parent_image_1,
-    s.parent_image_2,
-    s.joining_date,
-    s.current_status,
-    u.is_active,
-    u.generated_id,
-    s.created_at
-  FROM students s
-  INNER JOIN users u ON u.id = s.user_id AND u.college_id = s.college_id
-`;
+// Helper to format student record with user data
+async function formatStudent(studentRecord: any, db?: any): Promise<any> {
+  return {
+    ...studentRecord,
+    profile_image: studentRecord.profile_image || (studentRecord.users?.profile_image),
+    name: studentRecord.users?.name,
+    email: studentRecord.users?.email,
+    is_active: studentRecord.users?.is_active,
+    generated_id: studentRecord.users?.generated_id,
+  };
+}
 
 async function getStudentById(db: Awaited<ReturnType<typeof getDb>>, collegeId: string, studentId: string) {
-  return db.get(
-    `${STUDENT_SELECT} WHERE s.id = ? AND s.college_id = ?`,
-    [studentId, collegeId]
-  );
+  const { data, error } = await db
+    .from('students')
+    .select('*, users(id, name, email, profile_image, is_active, generated_id)')
+    .eq('id', studentId)
+    .eq('college_id', collegeId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw error;
+  }
+
+  return formatStudent(data);
 }
 
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
@@ -52,21 +41,25 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const collegeId = resolveCollegeId(req.user?.collegeId);
     const includeInactive = req.query.includeInactive === 'true' && ['admin', 'warden'].includes(req.user?.role || '');
 
-    let sql = `${STUDENT_SELECT} WHERE s.college_id = ?`;
-    const params: any[] = [collegeId];
+    let query = db
+      .from('students')
+      .select('*, users(id, name, email, profile_image, is_active, generated_id)')
+      .eq('college_id', collegeId)
+      .order('created_at', { ascending: false });
 
     if (!includeInactive) {
-      sql += ' AND u.is_active = 1';
+      query = query.eq('users.is_active', true);
     }
 
     if (req.user?.role === 'student') {
-      sql += ' AND s.user_id = ?';
-      params.push(req.user.userId);
+      query = query.eq('user_id', req.user.userId);
     }
 
-    sql += ' ORDER BY s.created_at DESC';
+    const { data, error } = await query;
 
-    const students = await db.all(sql, params);
+    if (error) throw error;
+
+    const students = await Promise.all((data || []).map((s) => formatStudent(s, db)));
     res.json(students || []);
   } catch (error) {
     console.error('Get students error:', error);
@@ -109,113 +102,136 @@ router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request
     const password = req.body.password || req.body.generatedPassword || req.body.generated_password || 'student123';
     const profileImage = req.body.profileImage || req.body.profile_image || null;
     const requestedIsActive = req.body.isActive ?? req.body.is_active;
-    const isActive = requestedIsActive === undefined ? 1 : (requestedIsActive ? 1 : 0);
+    const isActive = requestedIsActive === undefined ? true : !!requestedIsActive;
 
     let linkedUserId = req.body.user_id || req.body.userId;
 
-    await db.exec('BEGIN TRANSACTION');
-
     try {
       if (linkedUserId) {
-        const linkedUser = await db.get(
-          'SELECT id FROM users WHERE id = ? AND college_id = ?',
-          [linkedUserId, collegeId]
-        );
+        const { data: linkedUser, error: linkedUserError } = await db
+          .from('users')
+          .select('id')
+          .eq('id', linkedUserId)
+          .eq('college_id', collegeId)
+          .single();
 
-        if (!linkedUser) {
+        if (linkedUserError || !linkedUser) {
           throw new Error('Linked user not found for this college');
         }
 
-        await db.run(
-          `UPDATE users
-           SET name = COALESCE(?, name),
-               email = COALESCE(?, email),
-               role = 'student',
-               profile_image = COALESCE(?, profile_image),
-               generated_id = COALESCE(?, generated_id),
-               is_active = ?
-           WHERE id = ? AND college_id = ?`,
-          [name || null, email || null, profileImage, generatedId, isActive, linkedUserId, collegeId]
-        );
+        const { error: userUpdateError } = await db
+          .from('users')
+          .update({
+            ...(name && { name }),
+            ...(email && { email }),
+            role: 'student',
+            ...(profileImage && { profile_image: profileImage }),
+            ...(generatedId && { generated_id: generatedId }),
+            is_active: isActive,
+          })
+          .eq('id', linkedUserId)
+          .eq('college_id', collegeId);
+
+        if (userUpdateError) throw userUpdateError;
       } else {
         if (!name || !email) {
           throw new Error('name and email are required');
         }
 
-        let existingUser = await db.get(
-          'SELECT * FROM users WHERE college_id = ? AND email = ?',
-          [collegeId, email]
-        );
+        let { data: existingUser, error: existingUserError } = await db
+          .from('users')
+          .select('*')
+          .eq('college_id', collegeId)
+          .eq('email', email)
+          .single();
+
+        if (existingUserError && existingUserError.code !== 'PGRST116') {
+          throw existingUserError;
+        }
 
         if (!existingUser && generatedId) {
-          existingUser = await db.get(
-            'SELECT * FROM users WHERE college_id = ? AND generated_id = ?',
-            [collegeId, generatedId]
-          );
+          const { data: existingByGenId, error: existingByGenIdError } = await db
+            .from('users')
+            .select('*')
+            .eq('college_id', collegeId)
+            .eq('generated_id', generatedId)
+            .single();
+
+          if (existingByGenIdError && existingByGenIdError.code !== 'PGRST116') {
+            throw existingByGenIdError;
+          }
+
+          existingUser = existingByGenId;
         }
 
         const hashedPassword = await hashPassword(password);
 
         if (existingUser) {
           linkedUserId = existingUser.id;
-          await db.run(
-            `UPDATE users
-             SET name = ?,
-                 email = ?,
-                 password = ?,
-                 role = 'student',
-                 profile_image = COALESCE(?, profile_image),
-                 generated_id = COALESCE(?, generated_id),
-                 is_active = ?
-             WHERE id = ? AND college_id = ?`,
-            [name, email, hashedPassword, profileImage, generatedId, isActive, linkedUserId, collegeId]
-          );
+          const { error: userUpdateError } = await db
+            .from('users')
+            .update({
+              name,
+              email,
+              password: hashedPassword,
+              role: 'student',
+              ...(profileImage && { profile_image: profileImage }),
+              ...(generatedId && { generated_id: generatedId }),
+              is_active: isActive,
+            })
+            .eq('id', linkedUserId)
+            .eq('college_id', collegeId);
+
+          if (userUpdateError) throw userUpdateError;
         } else {
           linkedUserId = uuidv4();
-          await db.run(
-            `INSERT INTO users (
-              id, college_id, email, password, name, role, profile_image, generated_id, is_active
-            ) VALUES (?, ?, ?, ?, ?, 'student', ?, ?, ?)`,
-            [linkedUserId, collegeId, email, hashedPassword, name, profileImage, generatedId, isActive]
-          );
+          const { error: userInsertError } = await db.from('users').insert([
+            {
+              id: linkedUserId,
+              college_id: collegeId,
+              email,
+              password: hashedPassword,
+              name,
+              role: 'student',
+              profile_image: profileImage,
+              generated_id: generatedId,
+              is_active: isActive,
+            },
+          ]);
+
+          if (userInsertError) throw userInsertError;
         }
       }
 
-      await db.run(
-        `INSERT INTO students (
-          id, college_id, user_id, enrollment_number, course, year, gender, date_of_birth,
-          contact_number, address, guardian_name, guardian_contact, emergency_contact, medical_notes,
-          room_id, bed_id, profile_image, parent_image_1, parent_image_2, joining_date, current_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          studentId,
-          collegeId,
-          linkedUserId,
-          req.body.enrollment_number || req.body.enrollmentNumber,
-          req.body.course || null,
-          req.body.year || null,
-          req.body.gender || null,
-          req.body.date_of_birth || req.body.dateOfBirth || null,
-          req.body.contact_number || req.body.contactNumber || null,
-          req.body.address || null,
-          req.body.guardian_name || req.body.guardianName || null,
-          req.body.guardian_contact || req.body.guardianContact || null,
-          req.body.emergency_contact || req.body.emergencyContact || null,
-          req.body.medical_notes || req.body.medicalNotes || null,
-          req.body.room_id || req.body.roomId || null,
-          req.body.bed_id || req.body.bedId || null,
-          profileImage,
-          req.body.parent_image_1 || req.body.parentImage1 || null,
-          req.body.parent_image_2 || req.body.parentImage2 || null,
-          req.body.joining_date || req.body.joiningDate || null,
-          req.body.current_status || req.body.currentStatus || 'present',
-        ]
-      );
+      const { error: studentInsertError } = await db.from('students').insert([
+        {
+          id: studentId,
+          college_id: collegeId,
+          user_id: linkedUserId,
+          enrollment_number: req.body.enrollment_number || req.body.enrollmentNumber,
+          course: req.body.course || null,
+          year: req.body.year || null,
+          gender: req.body.gender || null,
+          date_of_birth: req.body.date_of_birth || req.body.dateOfBirth || null,
+          contact_number: req.body.contact_number || req.body.contactNumber || null,
+          address: req.body.address || null,
+          guardian_name: req.body.guardian_name || req.body.guardianName || null,
+          guardian_contact: req.body.guardian_contact || req.body.guardianContact || null,
+          emergency_contact: req.body.emergency_contact || req.body.emergencyContact || null,
+          medical_notes: req.body.medical_notes || req.body.medicalNotes || null,
+          room_id: req.body.room_id || req.body.roomId || null,
+          bed_id: req.body.bed_id || req.body.bedId || null,
+          profile_image: profileImage,
+          parent_image_1: req.body.parent_image_1 || req.body.parentImage1 || null,
+          parent_image_2: req.body.parent_image_2 || req.body.parentImage2 || null,
+          joining_date: req.body.joining_date || req.body.joiningDate || null,
+          current_status: req.body.current_status || req.body.currentStatus || 'present',
+        },
+      ]);
 
-      await db.exec('COMMIT');
-    } catch (error) {
-      await db.exec('ROLLBACK');
-      throw error;
+      if (studentInsertError) throw studentInsertError;
+    } catch (innerError) {
+      throw innerError;
     }
 
     const created = await getStudentById(db, collegeId, studentId);
@@ -226,7 +242,7 @@ router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request
       res.status(400).json({ error: error.message });
       return;
     }
-    if (error?.code === 'SQLITE_CONSTRAINT') {
+    if (error?.code === '23505' || error?.message?.includes('duplicate')) {
       res.status(409).json({ error: 'A student with this enrollment number, email, or linked user already exists' });
       return;
     }
@@ -253,8 +269,8 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
       return;
     }
 
-    const studentUpdates: Array<{ column: string; value: any }> = [];
-    const userUpdates: Array<{ column: string; value: any }> = [];
+    const studentUpdates: Record<string, any> = {};
+    const userUpdates: Record<string, any> = {};
 
     const studentMap = [
       ['enrollmentNumber', 'enrollment_number'],
@@ -301,64 +317,60 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
     ] as const;
 
     for (const [inputKey, column] of studentMap) {
-      if (req.body[inputKey] !== undefined) {
-        studentUpdates.push({ column, value: req.body[inputKey] });
+      if (req.body[inputKey] !== undefined && !(column in studentUpdates)) {
+        studentUpdates[column] = req.body[inputKey];
       }
     }
 
     for (const [inputKey, column] of userMap) {
-      if (req.body[inputKey] !== undefined) {
-        userUpdates.push({ column, value: req.body[inputKey] });
+      if (req.body[inputKey] !== undefined && !(column in userUpdates)) {
+        userUpdates[column] = req.body[inputKey];
       }
     }
 
     if (canManage && (req.body.isActive !== undefined || req.body.is_active !== undefined)) {
-      userUpdates.push({
-        column: 'is_active',
-        value: req.body.isActive !== undefined ? (req.body.isActive ? 1 : 0) : (req.body.is_active ? 1 : 0),
-      });
+      userUpdates.is_active = req.body.isActive !== undefined ? !!req.body.isActive : !!req.body.is_active;
     }
 
     const newPassword = req.body.password || req.body.generatedPassword || req.body.generated_password;
     if (newPassword) {
-      userUpdates.push({ column: 'password', value: await hashPassword(newPassword) });
+      userUpdates.password = await hashPassword(newPassword);
     }
 
-    if (studentUpdates.length === 0 && userUpdates.length === 0) {
+    if (Object.keys(studentUpdates).length === 0 && Object.keys(userUpdates).length === 0) {
       res.status(400).json({ error: 'No valid fields provided for update' });
       return;
     }
 
-    await db.exec('BEGIN TRANSACTION');
-
     try {
-      if (studentUpdates.length > 0) {
-        const setClause = studentUpdates.map((u) => `${u.column} = ?`).join(', ');
-        await db.run(
-          `UPDATE students SET ${setClause} WHERE id = ? AND college_id = ?`,
-          [...studentUpdates.map((u) => u.value), req.params.id, collegeId]
-        );
+      if (Object.keys(studentUpdates).length > 0) {
+        const { error: studentUpdateError } = await db
+          .from('students')
+          .update(studentUpdates)
+          .eq('id', req.params.id)
+          .eq('college_id', collegeId);
+
+        if (studentUpdateError) throw studentUpdateError;
       }
 
-      if (userUpdates.length > 0) {
-        const setClause = userUpdates.map((u) => `${u.column} = ?`).join(', ');
-        await db.run(
-          `UPDATE users SET ${setClause} WHERE id = ? AND college_id = ?`,
-          [...userUpdates.map((u) => u.value), existing.user_id, collegeId]
-        );
-      }
+      if (Object.keys(userUpdates).length > 0) {
+        const { error: userUpdateError } = await db
+          .from('users')
+          .update(userUpdates)
+          .eq('id', existing.user_id)
+          .eq('college_id', collegeId);
 
-      await db.exec('COMMIT');
-    } catch (error) {
-      await db.exec('ROLLBACK');
-      throw error;
+        if (userUpdateError) throw userUpdateError;
+      }
+    } catch (innerError) {
+      throw innerError;
     }
 
     const updated = await getStudentById(db, collegeId, req.params.id);
     res.json(updated);
   } catch (error: any) {
     console.error('Update student error:', error);
-    if (error?.code === 'SQLITE_CONSTRAINT') {
+    if (error?.code === '23505' || error?.message?.includes('duplicate')) {
       res.status(409).json({ error: 'Constraint violation while updating student' });
       return;
     }
@@ -377,51 +389,57 @@ router.delete('/:id', authenticate, authorize('admin', 'warden'), async (req: Re
       return;
     }
 
-    await db.exec('BEGIN TRANSACTION');
-
     try {
       if (existing.bed_id) {
-        await db.run(
-          `UPDATE beds
-           SET status = 'available', student_id = NULL, assigned_date = NULL
-           WHERE id = ? AND college_id = ?`,
-          [existing.bed_id, collegeId]
-        );
+        const { error: bedUpdateError } = await db
+          .from('beds')
+          .update({ status: 'available', student_id: null, assigned_date: null })
+          .eq('id', existing.bed_id)
+          .eq('college_id', collegeId);
+
+        if (bedUpdateError) throw bedUpdateError;
       }
 
       if (existing.room_id) {
-        const occupiedRow = await db.get(
-          `SELECT COUNT(*) as occupied_count
-           FROM beds
-           WHERE room_id = ? AND college_id = ? AND status = 'occupied'`,
-          [existing.room_id, collegeId]
-        );
+        const { count, error: countError } = await db
+          .from('beds')
+          .select('*', { count: 'exact', head: true })
+          .eq('room_id', existing.room_id)
+          .eq('college_id', collegeId)
+          .eq('status', 'occupied');
 
-        const occupiedBeds = Number(occupiedRow?.occupied_count || 0);
-        await db.run(
-          `UPDATE rooms
-           SET occupied_beds = ?, status = ?
-           WHERE id = ? AND college_id = ?`,
-          [occupiedBeds, occupiedBeds > 0 ? 'available' : 'available', existing.room_id, collegeId]
-        );
+        if (countError) throw countError;
+
+        const occupiedBeds = count || 0;
+        const { error: roomUpdateError } = await db
+          .from('rooms')
+          .update({
+            occupied_beds: occupiedBeds,
+            status: occupiedBeds > 0 ? 'available' : 'available',
+          })
+          .eq('id', existing.room_id)
+          .eq('college_id', collegeId);
+
+        if (roomUpdateError) throw roomUpdateError;
       }
 
-      await db.run(
-        `UPDATE students
-         SET room_id = NULL, bed_id = NULL, current_status = 'absent'
-         WHERE id = ? AND college_id = ?`,
-        [req.params.id, collegeId]
-      );
+      const { error: studentUpdateError } = await db
+        .from('students')
+        .update({ room_id: null, bed_id: null, current_status: 'absent' })
+        .eq('id', req.params.id)
+        .eq('college_id', collegeId);
 
-      await db.run(
-        'UPDATE users SET is_active = 0 WHERE id = ? AND college_id = ?',
-        [existing.user_id, collegeId]
-      );
+      if (studentUpdateError) throw studentUpdateError;
 
-      await db.exec('COMMIT');
-    } catch (error) {
-      await db.exec('ROLLBACK');
-      throw error;
+      const { error: userUpdateError } = await db
+        .from('users')
+        .update({ is_active: false })
+        .eq('id', existing.user_id)
+        .eq('college_id', collegeId);
+
+      if (userUpdateError) throw userUpdateError;
+    } catch (innerError) {
+      throw innerError;
     }
 
     res.json({ success: true });

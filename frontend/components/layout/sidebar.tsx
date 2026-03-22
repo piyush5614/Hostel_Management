@@ -16,7 +16,7 @@ export function Sidebar({ userRole }: SidebarProps) {
   return (
     <>
       {/* Mobile menu toggle */}
-      <div className="fixed left-0 top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border bg-background px-4 lg:hidden">
+      <div className="fixed left-0 top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border bg-background px-4 md:hidden">
         <Link to="/dashboard" className="flex items-center">
           <School className="h-8 w-8 text-primary-600" />
           <span className="ml-2 text-xl font-bold">TC Hostel Connect</span>
@@ -26,7 +26,7 @@ export function Sidebar({ userRole }: SidebarProps) {
           size="icon"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-label="Toggle menu"
-          className="lg:hidden"
+          className="md:hidden"
         >
           {isMobileMenuOpen ? (
             <X className="h-6 w-6" />
@@ -37,7 +37,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       </div>
 
       {/* Sidebar for desktop */}
-      <div className="hidden border-r border-border bg-card lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col">
+      <div className="hidden border-r border-border bg-card md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-64 md:flex-col">
         <div className="flex h-16 items-center border-b border-border px-6">
           <Link to="/dashboard" className="flex items-center">
             <School className="h-8 w-8 text-primary-600" />
@@ -52,7 +52,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       {/* Mobile sidebar */}
       <div
         className={cn(
-          'fixed inset-0 z-30 bg-black bg-opacity-50 transition-opacity lg:hidden',
+          'fixed inset-0 z-30 bg-black bg-opacity-50 transition-opacity md:hidden',
           isMobileMenuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
         onClick={() => setIsMobileMenuOpen(false)}
@@ -61,7 +61,7 @@ export function Sidebar({ userRole }: SidebarProps) {
 
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto bg-background transition-transform duration-300 ease-in-out lg:hidden',
+          'fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto bg-background transition-transform duration-300 ease-in-out md:hidden',
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >

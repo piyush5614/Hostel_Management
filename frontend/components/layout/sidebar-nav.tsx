@@ -6,7 +6,6 @@ import {
   Building2,
   Calendar,
   ChevronDown,
-  ClipboardList,
   LayoutDashboard,
   ListChecks,
   MessageCircle,
@@ -14,7 +13,6 @@ import {
   Users,
   Wrench,
   FileText,
-  AlertTriangle,
   CalendarDays,
   User,
   UserCheck,
@@ -24,7 +22,7 @@ import {
   ScanLine,
 } from 'lucide-react';
 
-interface NavItem {
+export interface NavItem {
   title: string;
   href: string;
   icon: React.ReactNode;
@@ -33,7 +31,7 @@ interface NavItem {
 }
 
 // Enhanced navigation items with role-based filtering
-const getNavItemsForRole = (role: UserRole): NavItem[] => {
+export const getNavItemsForRole = (role: UserRole): NavItem[] => {
   const baseItems: NavItem[] = [
     {
       title: 'Dashboard',
@@ -328,9 +326,10 @@ const getNavItemsForRole = (role: UserRole): NavItem[] => {
 
 interface SidebarNavProps {
   userRole: UserRole;
+  onNavigate?: () => void;
 }
 
-export function SidebarNav({ userRole }: SidebarNavProps) {
+export function SidebarNav({ userRole, onNavigate }: SidebarNavProps) {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   const toggleSubmenu = (title: string) => {
@@ -385,6 +384,7 @@ export function SidebarNav({ userRole }: SidebarNavProps) {
             ) : (
               <NavLink
                 to={item.href}
+                onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300 group',
@@ -411,6 +411,7 @@ export function SidebarNav({ userRole }: SidebarNavProps) {
                     <NavLink
                       key={subItem.href}
                       to={subItem.href}
+                      onClick={onNavigate}
                       className={({ isActive }) =>
                         cn(
                           'flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300',

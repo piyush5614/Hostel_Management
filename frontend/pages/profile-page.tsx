@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,6 +12,7 @@ import { Edit, Camera, Save, X, Upload, Image, Star, Sparkles, User, AlertTriang
 import { toast } from 'sonner';
 
 export function ProfilePage() {
+  const { t } = useTranslation();
   const { user, updateUser: updateAuthUser } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -193,12 +195,12 @@ export function ProfilePage() {
           <div className="flex items-center space-x-4">
             <Sparkles className="h-8 w-8 text-primary-200 animate-pulse" />
             <div>
-              <h1 className="text-4xl font-bold mb-2">My Profile</h1>
-              <p className="text-primary-100 text-lg">Manage your personal information</p>
+              <h1 className="text-4xl font-bold mb-2">{t('header.myProfile')}</h1>
+              <p className="text-primary-100 text-lg">{t('header.managePersonalInfo')}</p>
             </div>
           </div>
           
-          {user?.role !== 'student' && (
+          {user?.role === 'admin' && (
             !isEditing ? (
               <Button 
                 onClick={() => setIsEditing(true)}
@@ -206,7 +208,7 @@ export function ProfilePage() {
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50 backdrop-blur-sm"
               >
                 <Edit className="mr-2 h-4 w-4" />
-                Edit Profile
+                {t('header.editProfile')}
               </Button>
             ) : (
               <div className="flex space-x-2">
@@ -216,21 +218,21 @@ export function ProfilePage() {
                   className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50 backdrop-blur-sm"
                 >
                   <X className="mr-2 h-4 w-4" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button 
                   onClick={handleSave}
                   className="bg-white text-primary-700 hover:bg-white/90 shadow-lg"
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                  {t('header.saveChanges')}
                 </Button>
               </div>
             )
           )}
-          {user?.role === 'student' && (
+          {user?.role !== 'admin' && (
             <span className="text-sm text-primary-200 bg-white/10 px-3 py-1.5 rounded-full">
-              View Only
+              {t('header.viewOnly')}
             </span>
           )}
         </div>
@@ -258,7 +260,7 @@ export function ProfilePage() {
                   {user.name.charAt(0)}
                 </div>
               )}
-              {user?.role !== 'student' && (
+              {user?.role === 'admin' && (
                 <button
                   onClick={() => setIsImageModalOpen(true)}
                   className="absolute bottom-2 right-2 rounded-full bg-gradient-to-r from-primary-600 to-primary-700 p-3 text-white hover:from-primary-700 hover:to-primary-800 shadow-xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 border-3 border-white group-hover:animate-pulse"

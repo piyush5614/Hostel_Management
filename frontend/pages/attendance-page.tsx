@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -24,6 +25,7 @@ import { useDataRefresh } from '../utils/use-data-refresh';
 import { EVENTS } from '../utils/event-bus';
 
 export function AttendancePage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const refreshKey = useDataRefresh([EVENTS.ATTENDANCE_UPDATED, EVENTS.STUDENT_UPDATED]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
