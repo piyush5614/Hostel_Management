@@ -1,7 +1,9 @@
 import express from 'express';
 import 'dotenv/config';
+import http from 'http';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import * as Sentry from '@sentry/node';
 import { initDb, closeDb, getDb } from './db/init.js';
 import { createSchema, ensureIndexes } from './db/schema.js';
 import { hashPassword } from './utils/auth.js';
@@ -10,7 +12,10 @@ import { swaggerOptions } from './utils/swagger.js';
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_COLLEGE_ID, DEFAULT_COLLEGE_NAME } from './utils/tenant.js';
 import { applySecurityMiddleware, loginLimiter, errorHandler } from './middleware/security.js';
+import { compressionMiddleware } from './middleware/compression.js';
 import { log } from './utils/logger.js';
+import { initSentry, sentryRequestHandler, sentryErrorHandler } from './utils/sentry.js';
+import { initializeSocket } from './socket.js';
 import authRoutes from './routes/auth.js';
 import studentRoutes from './routes/students.js';
 import roomRoutes from './routes/rooms.js';
@@ -23,12 +28,22 @@ import visitorRoutes from './routes/visitors.js';
 import messageRoutes from './routes/messages.js';
 import reportRoutes from './routes/reports.js';
 import applicationRoutes from './routes/applications.js';
+import { createNotificationRoutes } from './routes/notifications.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Initialize Sentry for error tracking (if DSN is configured)
+initSentry();
+
 // Apply security middleware (headers, CORS, rate limiting, logging)
 applySecurityMiddleware(app);
+
+// Apply Sentry request handler (captures request info)
+app.use(sentryRequestHandler);
+
+// Apply compression middleware (reduces response size 60-80%)
+app.use(compressionMiddleware);
 
 // Parse JSON with size limit
 app.use(express.json({ limit: '50mb' }));
@@ -58,9 +73,17 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/applications', applicationRoutes);
 
+// Initialize WebSocket and attach notification routes
+const httpServer = http.createServer(app);
+const io = initializeSocket(httpServer);
+app.use('/api/notifications', createNotificationRoutes(io));
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Apply Sentry error handler (captures errors from routes)
+app.use(sentryErrorHandler);
 
 // Global error handler (must be last)
 app.use(errorHandler);
@@ -208,12 +231,13 @@ async function start(): Promise<void> {
     log.info('Seeding default room inventory...');
     await seedDefaultRooms();
 
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       log.info(`🚀 Server running on http://localhost:${PORT}`, { 
         environment: process.env.NODE_ENV,
         apiDocs: `http://localhost:${PORT}/api-docs`,
         health: `http://localhost:${PORT}/api/health`
       });
+      log.info('🔌 WebSocket server ready at ws://localhost:${PORT}');
       log.info('📚 API Documentation available at /api-docs');
     });
 

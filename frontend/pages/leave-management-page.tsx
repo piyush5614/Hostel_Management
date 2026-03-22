@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
+import { InfiniteList } from '../components/ui/infinite-list';
 import { EnhancedLeaveForm } from '../components/leave/enhanced-leave-form';
 import { LeaveQRCode } from '../components/leave/leave-qr-code';
 import { QRScannerModal } from '../components/leave/qr-scanner-modal';
@@ -36,6 +37,7 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { useDataRefresh } from '../utils/use-data-refresh';
 import { EVENTS } from '../utils/event-bus';
+import { PaginatedResponse } from '../lib/pagination';
 
 export function LeaveManagementPage() {
   const { t } = useTranslation();
@@ -97,6 +99,64 @@ export function LeaveManagementPage() {
     if (!user?.id) return null;
     return getLinkedStudent(user.id, user.email);
   };
+
+  // Fetch student leaves with cursor pagination
+  const fetchStudentLeaves = useCallback(async (cursor?: string): Promise<PaginatedResponse<LeaveRequest>> => {
+    try {
+      // TODO: Replace with actual API call: /api/leave?limit=50&cursor=${cursor}&type=student
+      let result = visibleStudentLeaves;
+
+      // Simulate cursor-based pagination
+      const pageSize = 50;
+      let startIndex = 0;
+
+      if (cursor) {
+        const cursorIndex = result.findIndex((lr) => lr.id === cursor);
+        startIndex = cursorIndex + 1;
+      }
+
+      const pageItems = result.slice(startIndex, startIndex + pageSize);
+      const nextCursor = startIndex + pageSize < result.length ? pageItems[pageItems.length - 1]?.id : undefined;
+
+      return {
+        data: pageItems,
+        cursor: nextCursor,
+        hasMore: !!nextCursor,
+      };
+    } catch (error) {
+      console.error('Failed to fetch student leaves:', error);
+      throw error;
+    }
+  }, [visibleStudentLeaves]);
+
+  // Fetch staff leaves with cursor pagination
+  const fetchStaffLeaves = useCallback(async (cursor?: string): Promise<PaginatedResponse<StaffLeaveRequest>> => {
+    try {
+      // TODO: Replace with actual API call: /api/leave?limit=50&cursor=${cursor}&type=staff
+      let result = visibleStaffLeaves;
+
+      // Simulate cursor-based pagination
+      const pageSize = 50;
+      let startIndex = 0;
+
+      if (cursor) {
+        const cursorIndex = result.findIndex((sr) => sr.id === cursor);
+        startIndex = cursorIndex + 1;
+      }
+
+      const pageItems = result.slice(startIndex, startIndex + pageSize);
+      const nextCursor = startIndex + pageSize < result.length ? pageItems[pageItems.length - 1]?.id : undefined;
+
+      return {
+        data: pageItems,
+        cursor: nextCursor,
+        hasMore: !!nextCursor,
+      };
+    } catch (error) {
+      console.error('Failed to fetch staff leaves:', error);
+      throw error;
+    }
+  }, [visibleStaffLeaves]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -368,10 +428,11 @@ export function LeaveManagementPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {visibleStudentLeaves.map((request) => (
+                    <InfiniteList
+                      queryKey={['studentLeaves', activeTab, refreshKey]}
+                      queryFn={fetchStudentLeaves}
+                      renderItem={(request) => (
                         <div
-                          key={request.id}
                           className={cn(
                             'cursor-pointer rounded-lg border p-4 transition-colors hover:bg-accent',
                             selectedRequest?.id === request.id && 'border-primary-500 bg-primary-50'
@@ -429,15 +490,23 @@ export function LeaveManagementPage() {
                             )}
                           </div>
                         </div>
-                      ))}
-
-                      {visibleStudentLeaves.length === 0 && (
+                      )}
+                      renderSkeleton={() => (
+                        <div className="rounded-lg border p-4 animate-pulse">
+                          <div className="h-5 bg-gray-200 rounded w-1/3 mb-3" />
+                          <div className="h-4 bg-gray-100 rounded w-full mb-2" />
+                          <div className="h-4 bg-gray-100 rounded w-2/3" />
+                        </div>
+                      )}
+                      renderEmpty={() => (
                         <div className="py-12 text-center text-muted-foreground">
                           <Calendar className="mx-auto mb-4 h-12 w-12 opacity-30" />
                           <p>No leave requests found.</p>
                         </div>
                       )}
-                    </div>
+                      containerClassName="space-y-4"
+                      skeletonCount={5}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -702,10 +771,11 @@ export function LeaveManagementPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {visibleStaffLeaves.map((request) => (
+                    <InfiniteList
+                      queryKey={['staffLeaves', activeTab, refreshKey]}
+                      queryFn={fetchStaffLeaves}
+                      renderItem={(request) => (
                         <div
-                          key={request.id}
                           className={cn(
                             'cursor-pointer rounded-lg border p-4 transition-colors hover:bg-accent',
                             selectedStaffLeave?.id === request.id && 'border-primary-500 bg-primary-50'
@@ -755,15 +825,23 @@ export function LeaveManagementPage() {
                             )}
                           </div>
                         </div>
-                      ))}
-
-                      {visibleStaffLeaves.length === 0 && (
+                      )}
+                      renderSkeleton={() => (
+                        <div className="rounded-lg border p-4 animate-pulse">
+                          <div className="h-5 bg-gray-200 rounded w-1/3 mb-3" />
+                          <div className="h-4 bg-gray-100 rounded w-full mb-2" />
+                          <div className="h-4 bg-gray-100 rounded w-2/3" />
+                        </div>
+                      )}
+                      renderEmpty={() => (
                         <div className="py-12 text-center text-muted-foreground">
                           <Briefcase className="mx-auto mb-4 h-12 w-12 opacity-30" />
                           <p>{isStaff ? 'No leave requests yet. Apply for leave using the button above.' : 'No staff leave requests found.'}</p>
                         </div>
                       )}
-                    </div>
+                      containerClassName="space-y-4"
+                      skeletonCount={5}
+                    />
                   </CardContent>
                 </Card>
               </div>

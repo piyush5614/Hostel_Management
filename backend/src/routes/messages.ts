@@ -6,6 +6,13 @@ import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
 
+/**
+ * GET / - Get messages with pagination
+ * Query parameters:
+ *   - limit: items per page (default 50, max 200)
+ *   - cursor: cursor ID for next page
+ *   - withUserId: filter messages with specific user
+ */
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
@@ -13,12 +20,16 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const collegeId = resolveCollegeId(user?.collegeId);
     const withUserId = typeof req.query.withUserId === 'string' ? req.query.withUserId.trim() : '';
 
+    // Pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const cursor = req.query.cursor as string | undefined;
+
     let query = db
       .from('messages')
       .select('*, users!sender_id(id, name), users!receiver_id(id, name)')
       .eq('college_id', collegeId)
       .or(`sender_id.eq.${user?.userId},receiver_id.eq.${user?.userId}`)
-      .order('created_at', { ascending: false });
+      .order('id', { ascending: true }); // Stable cursor
 
     if (withUserId) {
       query = query.or(
@@ -26,11 +37,26 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       );
     }
 
-    const { data: messages, error } = await query;
+    // Apply cursor filter
+    if (cursor) {
+      query = query.gt('id', cursor);
+    }
+
+    // Fetch one extra to detect if there are more pages
+    const { data: messages, error } = await query.limit(limit + 1);
 
     if (error) throw error;
 
-    res.json(messages || []);
+    const items = messages || [];
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : undefined;
+
+    res.json({
+      data: pageItems,
+      cursor: nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Internal server error' });

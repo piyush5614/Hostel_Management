@@ -22,6 +22,7 @@ interface AuthState {
   clearError: () => void;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
+  getToken: () => string | null;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -324,6 +325,18 @@ export const useAuthStore = create<AuthState>()(
           const errorMessage = error.message || 'Failed to update password';
           set({ isLoading: false, error: errorMessage });
           throw error;
+        }
+      },
+
+      getToken: () => {
+        try {
+          const session = localStorage.getItem('tc-hostel-enhanced-session');
+          if (!session) return null;
+          
+          const parsedSession = JSON.parse(session);
+          return parsedSession.user?.user_metadata?.access_token || parsedSession.access_token || null;
+        } catch {
+          return null;
         }
       },
     }),

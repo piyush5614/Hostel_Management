@@ -6,18 +6,27 @@ import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
 
-// GET all leave requests (admin/warden see all, students see their own)
+// GET all leave requests with pagination (admin/warden see all, students see their own)
+/**
+ * Query parameters:
+ *   - limit: items per page (default 50, max 200)
+ *   - cursor: cursor ID for next page
+ */
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
     const user = (req as any).user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
+    // Pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const cursor = req.query.cursor as string | undefined;
+
     let query = db
       .from('leave_requests')
       .select('*, students(user_id, guardian_name, guardian_contact, users(name))')
       .eq('college_id', collegeId)
-      .order('submitted_at', { ascending: false });
+      .order('id', { ascending: true }); // Stable cursor
 
     if (user.role === 'student') {
       const { data: student, error: studentError } = await db
@@ -28,18 +37,33 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
         .single();
 
       if (studentError || !student) {
-        res.json([]);
+        res.json({ data: [], cursor: undefined, hasMore: false });
         return;
       }
 
       query = query.eq('student_id', student.id);
     }
 
-    const { data: leaveRequests, error } = await query;
+    // Apply cursor filter
+    if (cursor) {
+      query = query.gt('id', cursor);
+    }
+
+    // Fetch one extra to detect if there are more pages
+    const { data: leaveRequests, error } = await query.limit(limit + 1);
 
     if (error) throw error;
 
-    res.json(leaveRequests || []);
+    const items = leaveRequests || [];
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : undefined;
+
+    res.json({
+      data: pageItems,
+      cursor: nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Get leave requests error:', error);
     res.status(500).json({ error: 'Internal server error' });

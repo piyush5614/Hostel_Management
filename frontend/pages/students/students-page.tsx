@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Button } from '../../components/ui/button';
 import { Modal } from '../../components/ui/modal';
 import { StudentForm } from '../../components/forms/student-form';
-import { Users, Search, Plus, Edit, Trash2, UserCircle } from 'lucide-react';
+import { InfiniteList } from '../../components/ui/infinite-list';
+import { Users, Search, Plus, Edit, Trash2, UserCircle, AlertCircle } from 'lucide-react';
 import { mockStudents, deleteStudent, syncStudentsFromApi } from '../../store/mock-data';
 import { Student } from '../../types';
 import { cn } from '../../lib/utils';
@@ -13,12 +14,12 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../../store/auth-store';
 import { useDataRefresh } from '../../utils/use-data-refresh';
 import { EVENTS } from '../../utils/event-bus';
+import { PaginatedResponse } from '../../lib/pagination';
 
 export function StudentsPage() {
   const user = useAuthStore((state) => state.user);
   const refreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED, EVENTS.ROOM_UPDATED]);
   const canEdit = user?.role === 'admin' || user?.role === 'warden';
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>(mockStudents);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -37,38 +38,60 @@ export function StudentsPage() {
     void syncStudentsFromApi();
   }, [user?.id]);
 
-  useEffect(() => {
-    let result = [...mockStudents];
+  // Fetch students with cursor pagination
+  const fetchStudents = useCallback(async (cursor?: string): Promise<PaginatedResponse<Student>> => {
+    try {
+      // TODO: Replace with actual API call when backend endpoint is ready
+      // const response = await fetch(`/api/students?limit=50&cursor=${cursor || ''}&course=${filter.course}&year=${filter.year}&gender=${filter.gender}&search=${searchQuery}`);
+      // const data = await response.json();
+      
+      // For now, simulate pagination from mock data
+      let result = [...mockStudents];
 
-    if (filter.course) {
-      result = result.filter((student) =>
-        student.course.toLowerCase().includes(filter.course.toLowerCase())
-      );
+      if (filter.course) {
+        result = result.filter((student) =>
+          student.course.toLowerCase().includes(filter.course.toLowerCase())
+        );
+      }
+
+      if (filter.year) {
+        result = result.filter((student) => student.year.toString() === filter.year);
+      }
+
+      if (filter.gender) {
+        result = result.filter((student) => student.gender === filter.gender);
+      }
+
+      if (searchQuery) {
+        result = result.filter((student) =>
+          student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          student.enrollmentNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          student.email.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+
+      // Simulate cursor-based pagination
+      const pageSize = 50;
+      let startIndex = 0;
+
+      if (cursor) {
+        const cursorIndex = result.findIndex((s) => s.id === cursor);
+        startIndex = cursorIndex + 1;
+      }
+
+      const pageItems = result.slice(startIndex, startIndex + pageSize);
+      const nextCursor = startIndex + pageSize < result.length ? pageItems[pageItems.length - 1]?.id : undefined;
+
+      return {
+        data: pageItems,
+        cursor: nextCursor,
+        hasMore: !!nextCursor,
+      };
+    } catch (error) {
+      console.error('Failed to fetch students:', error);
+      throw error;
     }
-
-    if (filter.year) {
-      result = result.filter((student) => student.year.toString() === filter.year);
-    }
-
-    if (filter.gender) {
-      result = result.filter((student) => student.gender === filter.gender);
-    }
-
-    if (searchQuery) {
-      result = result.filter((student) =>
-        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.enrollmentNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredStudents(result);
-
-    if (selectedStudent) {
-      const updatedStudent = mockStudents.find((student) => student.id === selectedStudent.id);
-      setSelectedStudent(updatedStudent || null);
-    }
-  }, [searchQuery, filter, refreshKey, selectedStudent?.id]);
+  }, [filter, searchQuery]);
 
   // Handle filter changes
   const handleFilterChange = (key: string, value: string) => {
@@ -190,17 +213,21 @@ export function StudentsPage() {
           </CardContent>
         </Card>
 
-        {/* Students List */}
+        {/* Students List with Infinite Scroll */}
         <div className={selectedStudent ? 'md:col-span-2' : 'md:col-span-4'}>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Students ({filteredStudents.length})</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Students
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {filteredStudents.map((student) => (
+              <InfiniteList
+                queryKey={['students', filter, searchQuery, refreshKey]}
+                queryFn={fetchStudents}
+                renderItem={(student) => (
                   <div
-                    key={student.id}
                     className={cn(
                       'group flex items-center justify-between rounded-md border p-3 transition-colors cursor-pointer',
                       selectedStudent?.id === student.id
@@ -256,17 +283,36 @@ export function StudentsPage() {
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-              
-              {filteredStudents.length === 0 && (
-                <div className="py-12 text-center text-muted-foreground">
-                  {mockStudents.length === 0 
-                    ? "No students added yet. Click 'Add New Student' to get started."
-                    : "No students match your search criteria"
-                  }
-                </div>
-              )}
+                )}
+                renderSkeleton={() => (
+                  <div className="flex items-center space-x-3 rounded-md border p-3 animate-pulse">
+                    <div className="h-10 w-10 rounded-full bg-gray-200" />
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-2" />
+                      <div className="h-3 bg-gray-100 rounded w-1/3" />
+                    </div>
+                  </div>
+                )}
+                renderEmpty={() => (
+                  <div className="py-12 text-center text-muted-foreground">
+                    {mockStudents.length === 0 
+                      ? "No students added yet. Click 'Add New Student' to get started."
+                      : "No students match your search criteria"
+                    }
+                  </div>
+                )}
+                renderError={(error, retry) => (
+                  <div className="py-8 text-center">
+                    <AlertCircle className="h-12 w-12 text-error-500 mx-auto mb-4" />
+                    <p className="text-error-600 mb-4">Failed to load students</p>
+                    <Button onClick={retry} variant="outline">
+                      Try Again
+                    </Button>
+                  </div>
+                )}
+                containerClassName="space-y-3"
+                skeletonCount={5}
+              />
             </CardContent>
           </Card>
         </div>

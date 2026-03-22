@@ -35,17 +35,30 @@ async function getStudentById(db: Awaited<ReturnType<typeof getDb>>, collegeId: 
   return formatStudent(data);
 }
 
+/**
+ * GET /students - Paginated list with cursor-based pagination
+ * Query parameters:
+ *   - limit: items per page (default 50, max 200)
+ *   - cursor: cursor ID for next page
+ *   - includeInactive: include deactivated users (admin/warden only)
+ * 
+ * Response includes 'cursor' field for fetching next page
+ */
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
     const includeInactive = req.query.includeInactive === 'true' && ['admin', 'warden'].includes(req.user?.role || '');
+    
+    // Pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const cursor = req.query.cursor as string | undefined;
 
     let query = db
       .from('students')
       .select('*, users(id, name, email, profile_image, is_active, generated_id)')
       .eq('college_id', collegeId)
-      .order('created_at', { ascending: false });
+      .order('id', { ascending: true }); // Stable cursor requires ordering by ID
 
     if (!includeInactive) {
       query = query.eq('users.is_active', true);
@@ -55,12 +68,28 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       query = query.eq('user_id', req.user.userId);
     }
 
-    const { data, error } = await query;
+    // Apply cursor filter: fetch items AFTER the cursor
+    if (cursor) {
+      query = query.gt('id', cursor);
+    }
+
+    // Fetch one extra to detect if there are more pages
+    const { data, error } = await query.limit(limit + 1);
 
     if (error) throw error;
 
-    const students = await Promise.all((data || []).map((s) => formatStudent(s, db)));
-    res.json(students || []);
+    const items = data || [];
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : undefined;
+
+    const students = await Promise.all(pageItems.map((s) => formatStudent(s, db)));
+    
+    res.json({
+      data: students,
+      cursor: nextCursor, // Use this cursor for next page
+      hasMore,
+    });
   } catch (error) {
     console.error('Get students error:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -6,10 +6,22 @@ import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
 
+/**
+ * GET / - Get visitors with pagination
+ * Query parameters:
+ *   - limit: items per page (default 50, max 200)
+ *   - cursor: cursor ID for next page
+ *   - active: filter only current check-ins
+ *   - date: filter by specific date (YYYY-MM-DD)
+ */
 router.get('/', authenticate, authorize('admin', 'warden', 'staff'), async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
+
+    // Pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const cursor = req.query.cursor as string | undefined;
 
     let query = db
       .from('visitors')
@@ -19,25 +31,38 @@ router.get('/', authenticate, authorize('admin', 'warden', 'staff'), async (req:
          staff(employee_id)`
       )
       .eq('college_id', collegeId)
-      .order('check_in_time', { ascending: false });
+      .order('id', { ascending: true }); // Stable cursor
 
     if (typeof req.query.active === 'string' && req.query.active === 'true') {
       query = query.is('check_out_time', null);
     }
 
     if (typeof req.query.date === 'string' && req.query.date.trim()) {
-      // For date filtering, we'll need to handle this after fetching
-      // since Supabase doesn't have a direct date() function for comparisons
       const dateStr = req.query.date.trim();
       query = query.gte('check_in_time', `${dateStr}T00:00:00`)
         .lte('check_in_time', `${dateStr}T23:59:59`);
     }
 
-    const { data: visitors, error } = await query;
+    // Apply cursor filter
+    if (cursor) {
+      query = query.gt('id', cursor);
+    }
+
+    // Fetch one extra to detect if there are more pages
+    const { data: visitors, error } = await query.limit(limit + 1);
 
     if (error) throw error;
 
-    res.json(visitors || []);
+    const items = visitors || [];
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : undefined;
+
+    res.json({
+      data: pageItems,
+      cursor: nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Get visitors error:', error);
     res.status(500).json({ error: 'Internal server error' });

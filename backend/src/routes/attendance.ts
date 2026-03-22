@@ -6,18 +6,30 @@ import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
 
+/**
+ * GET / - Get attendance records with pagination
+ * Query parameters:
+ *   - limit: items per page (default 50, max 200)
+ *   - cursor: cursor ID for next page
+ *   - date: filter by specific date (YYYY-MM-DD)
+ *   - studentId: filter by student ID
+ *   - roomId: filter by room ID
+ */
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
+    // Pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const cursor = req.query.cursor as string | undefined;
+
     let query = db
       .from('attendance')
       .select('*, students(enrollment_number, room_id, user_id), users:students(user_id).name')
       .eq('college_id', collegeId)
-      .order('date', { ascending: false })
-      .order('recorded_at', { ascending: false });
+      .order('id', { ascending: true }); // Stable cursor
 
     if (user?.role === 'student') {
       const { data: studentData, error: studentError } = await db
@@ -28,7 +40,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
         .single();
 
       if (studentError || !studentData) {
-        res.json([]);
+        res.json({ data: [], cursor: undefined, hasMore: false });
         return;
       }
 
@@ -47,11 +59,26 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       query = query.eq('students.room_id', req.query.roomId.trim());
     }
 
-    const { data: records, error } = await query;
+    // Apply cursor filter
+    if (cursor) {
+      query = query.gt('id', cursor);
+    }
+
+    // Fetch one extra to detect if there are more pages
+    const { data: records, error } = await query.limit(limit + 1);
 
     if (error) throw error;
 
-    res.json(records || []);
+    const items = records || [];
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : undefined;
+
+    res.json({
+      data: pageItems,
+      cursor: nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Get attendance error:', error);
     res.status(500).json({ error: 'Internal server error' });
