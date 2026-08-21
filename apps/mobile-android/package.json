@@ -1,0 +1,17 @@
+{
+  "name": "@hostel-connect/mobile-android",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android",
+    "cap:copy": "cap copy android",
+    "cap:run": "cap run android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0"
+  }
+}

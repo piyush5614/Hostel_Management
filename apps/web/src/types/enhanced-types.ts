@@ -1,4 +1,5 @@
 // Enhanced types for new functionality
+import type { LeaveRequest, StaffTask, Student, Attendance, Application, Activity } from './index';
 
 export interface SMSNotification {
   id: string;

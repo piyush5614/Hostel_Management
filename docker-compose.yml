@@ -4,7 +4,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: services/api/Dockerfile
     container_name: hostel-backend-dev
     ports:
       - "3001:3001"
@@ -17,8 +17,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:3001}
     volumes:
-      - ./backend/src:/app/src
-      - ./backend/dist:/app/dist
+      - ./services/api/src:/app/src
+      - ./services/api/dist:/app/dist
     networks:
       - hostel-network
     healthcheck:
@@ -35,7 +35,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: apps/web/Dockerfile
     container_name: hostel-frontend-dev
     ports:
       - "5173:5173"
@@ -43,8 +43,8 @@ services:
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://your-project.supabase.co}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-your-key}
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/components:/app/components
+      - ./apps/web/src:/app/src
+      - ./apps/web/public:/app/public
       - /app/node_modules
     networks:
       - hostel-network

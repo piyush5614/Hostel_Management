@@ -10,10 +10,8 @@ COPY vite.config.ts ./
 COPY index.html ./
 COPY postcss.config.js ./
 COPY tailwind.config.js ./
-COPY eslint.config.js ./
 
-# Copy source files
-COPY frontend ./frontend
+# Copy source and static assets
 COPY src ./src
 COPY public ./public
 
@@ -23,5 +21,5 @@ RUN npm ci
 # Expose Vite dev server port
 EXPOSE 5173
 
-# Start dev server (listen on all interfaces for Docker)
+# Start dev server
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

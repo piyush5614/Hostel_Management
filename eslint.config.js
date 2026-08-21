@@ -5,13 +5,29 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'backend/dist', 'node_modules', 'android', 'company-control-center'] },
+  {
+    ignores: [
+      'dist',
+      '**/dist/**',
+      'node_modules',
+      '**/node_modules/**',
+      '**/android/**',
+      '.venv',
+      'playwright-report',
+      'test-results',
+      'docs',
+      'apps/mobile-android/**',
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,js,jsx}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
     plugins: {
       'react-hooks': reactHooks,
@@ -20,11 +36,17 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-      }],
+      '@typescript-eslint/no-namespace': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+      'no-useless-catch': 'off',
       'no-console': 'off',
+      'prefer-const': 'warn',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },

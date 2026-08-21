@@ -1,6 +1,6 @@
 // SMS Notification Service for Leave Applications
 import { LeaveRequest, Student } from '../../types';
-import { sendLeaveApprovalSMS, processParentApproval } from '../../store/enhanced-mock-data';
+import { sendLeaveApprovalSMS, processParentApproval, mockSMSNotifications } from '../../store/enhanced-mock-data';
 
 export interface SMSConfig {
   apiKey: string;
@@ -106,8 +106,6 @@ TC Hostel Management`;
 
   // Get SMS notification history
   getNotificationHistory(studentId?: string) {
-    const { mockSMSNotifications } = require('../../store/enhanced-mock-data');
-    
     if (studentId) {
       return mockSMSNotifications.filter((n: any) => n.studentId === studentId);
     }

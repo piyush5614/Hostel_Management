@@ -1,148 +1,132 @@
-# HostelHub
+# TC Hostel Connect — Monorepo Architecture
 
-A comprehensive hostel management system for student housing built with React, TypeScript, and Vite.
+A modern, full-stack, enterprise-grade Hostel Management Platform built as a scalable Monorepo utilizing **npm Workspaces**, **Turborepo**, **React 18 + Vite**, **Express.js**, and **Capacitor Mobile**.
 
-## Features
+---
 
-- **Dashboard & Analytics** — Real-time occupancy charts, stats, and recent activity tracking
-- **Student Management** — Register, view, and manage student profiles and hostel records
-- **Room Allocation** — Room management with auto-assign, manual allocation, and occupancy tracking
-- **Leave Management** — Student leave requests with parent approval workflow
-- **Attendance Tracking** — Daily attendance monitoring for hostel residents
-- **Staff & Task Management** — Staff profiles, role-based access, and task assignment
-- **Maintenance Requests** — Track and manage hostel maintenance issues
-- **Visitor Management** — Log and monitor visitor entries
-- **Credential Management** — Manage user roles and access credentials
-- **Events & Announcements** — Hostel events and announcement system
-- **Messaging** — In-app messaging between students, staff, and wardens
-- **Reports & Export** — Generate and export reports (PDF/Excel)
-- **PWA Support** — Installable progressive web app with offline capabilities
+## 🏗️ Repository Architecture
 
-## Tech Stack
-
-| Layer | Technologies |
-|-------|-------------|
-| **Frontend** | React 18, TypeScript, Vite 5 |
-| **Styling** | Tailwind CSS, tailwindcss-animate |
-| **State** | Zustand |
-| **Forms** | React Hook Form, Zod validation |
-| **Charts** | Chart.js, react-chartjs-2 |
-| **Routing** | React Router v6 |
-| **Icons** | Lucide React |
-| **Backend** | Express, SQLite3, JWT auth |
-| **Database** | Supabase (optional), SQLite |
-| **Notifications** | Sonner (toast) |
-
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) v18 or higher
-- npm v9+
-
-## Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/Akuma09-create/HostelHub.git
-cd HostelHub
+```text
+hostel-connect/
+├── apps/
+│   ├── web/                    # Main Portal: Student, Staff, Warden & Admin (React + Vite)
+│   │   ├── src/                # Clean source root
+│   │   ├── public/             # Static web assets
+│   │   ├── index.html          # Standard HTML entry point
+│   │   ├── vite.config.ts      # Vite configuration & Rollup chunking
+│   │   └── package.json        # @hostel-connect/web
+│   ├── control-center/         # Company Super Admin & Multi-Tenant Control Center
+│   │   ├── src/                # Server & governance engine
+│   │   └── package.json        # @hostel-connect/control-center
+│   └── mobile-android/         # Capacitor Android wrapper & native bridge
+│       ├── android/            # Native Android Studio project
+│       ├── capacitor.config.ts # Capacitor configuration
+│       └── package.json        # @hostel-connect/mobile-android
+├── services/
+│   └── api/                    # Node.js / Express REST & WebSocket API Service
+│       ├── src/                # Modular controllers, middleware & routes
+│       ├── database/           # Schema migrations & SQL definitions
+│       ├── Dockerfile          # Production multi-stage Docker build
+│       └── package.json        # @hostel-connect/api
+├── packages/
+│   ├── config/                 # Shared ESLint, TypeScript & build configurations
+│   └── types/                  # Shared domain contracts & TypeScript interfaces
+├── tests/
+│   ├── e2e/                    # Playwright end-to-end test suites
+│   └── load/                   # k6 performance test suites
+├── scripts/                    # Maintenance & report generation scripts
+├── .env.example                # Unified root environment template
+├── docker-compose.yml          # Multi-container local orchestration
+├── package.json                # Workspace root
+├── turbo.json                  # Turborepo task pipeline configuration
+└── README.md                   # System documentation
 ```
 
-### 2. Install dependencies
+---
 
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js**: v18.0.0 or higher
+- **npm**: v9.0.0 or higher
+
+### 1. Install All Workspace Dependencies
 ```bash
 npm install
 ```
 
-### 3. Configure environment
-
+### 2. Configure Environment Variables
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` as needed. By default, mock mode is enabled for local development with demo accounts:
+### 3. Run Development Servers
+```bash
+# Concurrently start Web Portal (port 5173) and Backend API (port 3001)
+npm run dev
 
-| Account | Email | Password |
-|---------|-------|----------|
-| Admin | admin@tchostel.edu | password |
-| Warden | warden@tchostel.edu | password |
-| Staff | staff@tchostel.edu | password |
-| Student | student@tchostel.edu | password |
+# Or run individual workspaces:
+npm run dev:web            # Start React Vite frontend
+npm run dev:api            # Start Express backend
+npm run dev:control-center # Start Company Control Center
+```
 
-### 4. Start the development server
+---
+
+## 🛠️ Workspaces & Available Scripts
+
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Starts Backend API and Web Portal concurrently |
+| `npm run dev:web` | Starts `@hostel-connect/web` dev server |
+| `npm run dev:api` | Starts `@hostel-connect/api` dev server |
+| `npm run dev:control-center` | Starts `@hostel-connect/control-center` |
+| `npm run build` | Builds all packages and applications in topological order |
+| `npm run build:web` | Builds the web application for production |
+| `npm run build:api` | Compiles the backend TypeScript service |
+| `npm run build:control-center` | Compiles the control center TypeScript service |
+| `npm run lint` | Runs ESLint flat config validation across all packages |
+| `npm run test` | Executes unit and component tests with Vitest |
+| `npm run test:api` | Executes backend API route integration tests |
+| `npm run test:e2e` | Runs Playwright end-to-end browser tests |
+| `npm run test:load` | Executes k6 performance and stress tests |
+| `npm run test:all` | Runs the full verification test suite |
+| `npm run cap:sync` | Syncs web assets to the Android Capacitor project |
+
+---
+
+## 🐳 Docker Deployment
+
+To launch all services in isolated Docker containers:
 
 ```bash
-npm run dev
+docker-compose up --build
 ```
 
-The app will be available at **http://localhost:5173**
+- **Frontend Application**: `http://localhost:5173`
+- **Backend API**: `http://localhost:3001`
+- **API Health Check**: `http://localhost:3001/api/health`
 
-### 5. (Optional) Start the backend server
+---
 
+## 📱 Mobile Hybrid App (Android)
+
+Build and sync web assets to Capacitor Android:
 ```bash
-cd server
-npm install
-npm run dev
+npm run build:web
+npm run cap:sync
 ```
 
-## Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Build for production |
-| `npm run preview` | Preview production build |
-| `npm run lint` | Run ESLint |
-
-## Project Structure
-
-```
-├── public/               # Static assets & PWA manifest
-├── server/               # Express backend (SQLite, JWT)
-│   └── src/
-│       ├── db/           # Database init & schema
-│       ├── middleware/    # Auth middleware
-│       ├── routes/       # API routes (auth, rooms, students)
-│       └── utils/        # Utilities
-├── src/
-│   ├── components/       # Reusable UI components
-│   │   ├── dashboard/    # Dashboard widgets & charts
-│   │   ├── forms/        # Form components (rooms, students, staff)
-│   │   ├── layout/       # Header, sidebar, main layout
-│   │   ├── leave/        # Leave management components
-│   │   └── ui/           # Base UI components
-│   ├── pages/            # Route pages
-│   │   ├── attendance/   # Attendance tracking
-│   │   ├── dashboard/    # Dashboard page
-│   │   ├── leave/        # Leave management
-│   │   ├── maintenance/  # Maintenance requests
-│   │   ├── rooms/        # Room management
-│   │   ├── staff/        # Staff management
-│   │   ├── students/     # Student management
-│   │   └── visitors/     # Visitor management
-│   ├── services/         # API & business logic services
-│   ├── store/            # Zustand state management
-│   ├── types/            # TypeScript type definitions
-│   ├── lib/              # Supabase client & utilities
-│   └── utils/            # Shared utilities
-├── supabase/             # Supabase migrations & functions
-├── .env.example          # Environment configuration template
-├── index.html            # Entry HTML
-├── vite.config.ts        # Vite configuration
-├── tailwind.config.js    # Tailwind CSS configuration
-└── tsconfig.json         # TypeScript configuration
+To open in Android Studio:
+```bash
+npm run cap:open
 ```
 
-## Supabase Setup (Optional)
+---
 
-To use Supabase instead of mock data:
+## 🔒 Security & Quality Standards
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Get your project URL and anon key from **Settings > API**
-3. Update `.env`:
-   ```
-   VITE_SUPABASE_URL=https://your-project-id.supabase.co
-   VITE_SUPABASE_ANON_KEY=your_anon_key
-   VITE_MOCK_MODE=false
-   ```
-4. Run migrations from `supabase/migrations/`
-5. Restart the dev server
+- **Zero Breaking Changes**: All API routes, data structures, and database migrations remain backwards-compatible.
+- **Type Safety**: Unified types shared across frontend and backend via `@hostel-connect/types`.
+- **Linting & Formatting**: Single ESLint flat configuration for the entire monorepo.
+- **Automated Testing**: 100+ automated unit, API integration, and E2E browser tests.

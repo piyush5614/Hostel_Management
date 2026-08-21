@@ -1,5 +1,5 @@
 {
-  "name": "company-control-center",
+  "name": "@hostel-connect/control-center",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@hostel-connect/types": "*",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "helmet": "^8.1.0",
-    "tc-hostel-connect": "file:..",
     "uuid": "^11.0.3",
     "zod": "^3.24.1"
   },
