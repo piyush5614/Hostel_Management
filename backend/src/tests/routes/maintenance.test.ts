@@ -10,6 +10,7 @@ import express, { Express } from 'express';
 describe('Maintenance API', () => {
   let app: Express;
   let testMaintenanceId: string;
+  const maintenanceStore: Record<string, any> = {};
 
   beforeAll(() => {
     app = express();
@@ -20,12 +21,15 @@ describe('Maintenance API', () => {
     mockRouter.get('/', (req, res) => {
       res.json([
         { id: testMaintenanceId, title: 'Pipe leak in room 301', category: 'plumbing', priority: 'high', status: 'open', created_at: '2025-03-20' },
+        ...Object.values(maintenanceStore)
       ]);
     });
 
     mockRouter.get('/:id', (req, res) => {
       if (req.params.id === testMaintenanceId) {
         res.json({ id: testMaintenanceId, title: 'Pipe leak', category: 'plumbing', priority: 'high', status: 'open' });
+      } else if (maintenanceStore[req.params.id]) {
+        res.json(maintenanceStore[req.params.id]);
       } else {
         res.status(404).json({ error: 'Maintenance request not found' });
       }
@@ -35,12 +39,19 @@ describe('Maintenance API', () => {
       if (!req.body.title || !req.body.category) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
-      res.status(201).json({ id: 'new-maint', status: 'open', priority: 'medium', ...req.body });
+      const newId = `maint-${Date.now()}`;
+      const newMaint = { id: newId, status: 'open', priority: req.body.priority || 'medium', created_at: new Date().toISOString(), ...req.body };
+      maintenanceStore[newId] = newMaint;
+      res.status(201).json(newMaint);
     });
 
     mockRouter.patch('/:id', (req, res) => {
       if (req.params.id === testMaintenanceId) {
         res.json({ id: testMaintenanceId, ...req.body });
+      } else if (maintenanceStore[req.params.id]) {
+        const updated = { ...maintenanceStore[req.params.id], ...req.body };
+        maintenanceStore[req.params.id] = updated;
+        res.json(updated);
       } else {
         res.status(404).json({ error: 'Maintenance request not found' });
       }

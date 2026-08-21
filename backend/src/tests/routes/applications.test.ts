@@ -11,6 +11,7 @@ describe('Applications API', () => {
   let app: Express;
   let testApplicationId: string;
   let testStudentId: string;
+  const applicationsStore: Record<string, any> = {};
 
   beforeAll(() => {
     app = express();
@@ -21,12 +22,15 @@ describe('Applications API', () => {
     mockRouter.get('/', (req, res) => {
       res.json([
         { id: testApplicationId, student_id: testStudentId, type: 'hostel', status: 'pending', created_at: '2025-03-20' },
+        ...Object.values(applicationsStore)
       ]);
     });
 
     mockRouter.get('/:id', (req, res) => {
       if (req.params.id === testApplicationId) {
         res.json({ id: testApplicationId, student_id: testStudentId, type: 'hostel', status: 'pending' });
+      } else if (applicationsStore[req.params.id]) {
+        res.json(applicationsStore[req.params.id]);
       } else {
         res.status(404).json({ error: 'Application not found' });
       }
@@ -36,12 +40,19 @@ describe('Applications API', () => {
       if (!req.body.student_id || !req.body.type) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
-      res.status(201).json({ id: 'new-app', status: 'pending', ...req.body });
+      const newId = `app-${Date.now()}`;
+      const newApp = { id: newId, status: 'pending', created_at: new Date().toISOString(), ...req.body };
+      applicationsStore[newId] = newApp;
+      res.status(201).json(newApp);
     });
 
     mockRouter.patch('/:id', (req, res) => {
       if (req.params.id === testApplicationId) {
         res.json({ id: testApplicationId, ...req.body });
+      } else if (applicationsStore[req.params.id]) {
+        const updated = { ...applicationsStore[req.params.id], ...req.body };
+        applicationsStore[req.params.id] = updated;
+        res.json(updated);
       } else {
         res.status(404).json({ error: 'Application not found' });
       }

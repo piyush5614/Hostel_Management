@@ -8,6 +8,7 @@ import {
   GeneratedCredential, ActivityLog, TaskComment, TaskProgress
 } from '../types';
 import { registerCredentialForLogin } from '../lib/supabase';
+import { exportService } from '../services/export';
 import { eventBus, EVENTS } from '../utils/event-bus';
 import { 
   getAllEnhancedStudents, 
@@ -207,7 +208,7 @@ const persisted = loadFromStorage();
 
 // Real system data - loads from localStorage if available, otherwise defaults
 export let mockStudents: Student[] = persisted?.students ?? getAllEnhancedStudents();
-export let mockStaff: Staff[] = persisted?.staff ?? getAllEnhancedStaff();
+export const mockStaff: Staff[] = persisted?.staff ?? getAllEnhancedStaff();
 
 // Generate rooms for 3 floors with specified counts
 const generateRooms = (): Room[] => {
@@ -264,22 +265,22 @@ if (!persisted?.beds) {
 
 // Real system data stores (load from localStorage or defaults)
 export let mockAttendance: Attendance[] = persisted?.attendance ?? getHistoricalAttendance();
-export let mockStaffAttendance: StaffAttendance[] = persisted?.staffAttendance ?? [];
+export const mockStaffAttendance: StaffAttendance[] = persisted?.staffAttendance ?? [];
 export let mockLeaveRequests: LeaveRequest[] = persisted?.leaveRequests ?? enhancedMockLeaveRequests;
-export let mockStaffLeaveRequests: StaffLeaveRequest[] = persisted?.staffLeaveRequests ?? [];
-export let mockMaintenanceRequests: MaintenanceRequest[] = persisted?.maintenanceRequests ?? [];
-export let mockVisitors: Visitor[] = persisted?.visitors ?? [];
-export let mockMessages: Message[] = persisted?.messages ?? [];
-export let mockReports: Report[] = persisted?.reports ?? [];
-export let mockApplications: Application[] = persisted?.applications ?? [];
-export let mockStaffShifts: StaffShift[] = persisted?.staffShifts ?? [];
-export let mockStaffTasks: StaffTask[] = persisted?.staffTasks ?? enhancedMockStaffTasks;
-export let mockDailyReports: DailyReport[] = persisted?.dailyReports ?? [];
-export let mockAttendanceSheets: AttendanceSheet[] = persisted?.attendanceSheets ?? [];
-export let mockSystemSettings: SystemSettings[] = persisted?.systemSettings ?? [];
-export let mockEvents: Event[] = persisted?.events ?? [];
-export let mockEventRegistrations: EventRegistration[] = persisted?.eventRegistrations ?? [];
-export let mockUserSettings: any[] = persisted?.userSettings ?? [];
+export const mockStaffLeaveRequests: StaffLeaveRequest[] = persisted?.staffLeaveRequests ?? [];
+export const mockMaintenanceRequests: MaintenanceRequest[] = persisted?.maintenanceRequests ?? [];
+export const mockVisitors: Visitor[] = persisted?.visitors ?? [];
+export const mockMessages: Message[] = persisted?.messages ?? [];
+export const mockReports: Report[] = persisted?.reports ?? [];
+export const mockApplications: Application[] = persisted?.applications ?? [];
+export const mockStaffShifts: StaffShift[] = persisted?.staffShifts ?? [];
+export const mockStaffTasks: StaffTask[] = persisted?.staffTasks ?? enhancedMockStaffTasks;
+export const mockDailyReports: DailyReport[] = persisted?.dailyReports ?? [];
+export const mockAttendanceSheets: AttendanceSheet[] = persisted?.attendanceSheets ?? [];
+export const mockSystemSettings: SystemSettings[] = persisted?.systemSettings ?? [];
+export const mockEvents: Event[] = persisted?.events ?? [];
+export const mockEventRegistrations: EventRegistration[] = persisted?.eventRegistrations ?? [];
+export const mockUserSettings: any[] = persisted?.userSettings ?? [];
 
 // Real-time dashboard statistics
 export const getDashboardStats = (): DashboardStats => {
@@ -1077,7 +1078,7 @@ export const recordParentCall = (leaveRequestId: string, calledBy: string, notes
 // Find leave request by parent phone number (guardian contact)
 export const findLeaveByParentPhone = (phone: string) => {
   // Normalize the phone: strip spaces, dashes, and leading +
-  const normalize = (p: string) => p.replace(/[\s\-\+\(\)]/g, '');
+  const normalize = (p: string) => p.replace(/[\s\-+()]/g, '');
   const normalizedPhone = normalize(phone);
 
   for (const req of mockLeaveRequests) {
@@ -1140,9 +1141,6 @@ export const rejectStaffLeaveRequest = (id: string, reviewerId: string, approver
 
 // Export functions
 export const exportData = (type: string, format: 'pdf' | 'excel' | 'csv', filters?: any) => {
-  // Import and use the real export service
-  const { exportService } = require('../services/export');
-
   let data: any[] = [];
   let headers: string[] = [];
   let title = '';
@@ -1375,8 +1373,8 @@ export const submitAttendanceToAdmin = (sheetId: string) => {
 // ============================================================
 // Credential Management
 // ============================================================
-export let mockCredentials: GeneratedCredential[] = persisted?.credentials ?? [];
-export let mockActivityLogs: ActivityLog[] = persisted?.activityLogs ?? [];
+export const mockCredentials: GeneratedCredential[] = persisted?.credentials ?? [];
+export const mockActivityLogs: ActivityLog[] = persisted?.activityLogs ?? [];
 
 // Re-register persisted credentials with the login system on startup
 if (persisted?.credentials) {

@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HostelComp Company Control Center</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap');
+
+      :root {
+        --bg-1: #eff6ff;
+        --bg-2: #f8fafc;
+        --bg-3: #f3e8ff;
+        --panel: rgba(255, 255, 255, 0.9);
+        --panel-strong: rgba(255, 255, 255, 0.97);
+        --ink: #0f172a;
+        --muted: #475569;
+        --line: rgba(148, 163, 184, 0.34);
+        --brand: #2563eb;
+        --brand-2: #7c3aed;
+        --accent: #06b6d4;
+        --danger: #ef4444;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 10%, rgba(59, 130, 246, 0.22) 0, transparent 36%),
+          radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.2) 0, transparent 34%),
+          radial-gradient(circle at 55% 100%, rgba(6, 182, 212, 0.18) 0, transparent 34%),
+          linear-gradient(150deg, var(--bg-1), var(--bg-2) 52%, var(--bg-3));
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(59, 130, 246, 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
+      }
+
+      .float-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      .float-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(1px);
+        opacity: 0.55;
+        animation: driftUp linear infinite;
+      }
+
+      .float-orb:nth-child(1) {
+        width: 140px;
+        height: 140px;
+        left: 8%;
+        bottom: -180px;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.44), rgba(59, 130, 246, 0));
+        animation-duration: 20s;
+      }
+
+      .float-orb:nth-child(2) {
+        width: 180px;
+        height: 180px;
+        left: 68%;
+        bottom: -220px;
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.4), rgba(139, 92, 246, 0));
+        animation-duration: 24s;
+      }
+
+      .float-orb:nth-child(3) {
+        width: 110px;
+        height: 110px;
+        left: 42%;
+        bottom: -140px;
+        background: radial-gradient(circle, rgba(6, 182, 212, 0.38), rgba(6, 182, 212, 0));
+        animation-duration: 18s;
+      }
+
+      @keyframes driftUp {
+        0% {
+          transform: translateY(0) translateX(0) scale(0.94);
+          opacity: 0;
+        }
+        12% {
+          opacity: 0.42;
+        }
+        80% {
+          opacity: 0.42;
+        }
+        100% {
+          transform: translateY(-110vh) translateX(35px) scale(1.25);
+          opacity: 0;
+        }
+      }
+
+      .shell {
+        max-width: 1280px;
+        margin: 22px auto;
+        padding: 0 18px 36px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero {
+        background:
+          linear-gradient(130deg, rgba(37, 99, 235, 0.95), rgba(59, 130, 246, 0.93) 46%, rgba(124, 58, 237, 0.9));
+        color: #eff6ff;
+        border-radius: 26px;
+        padding: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        box-shadow: 0 24px 45px rgba(37, 99, 235, 0.22);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.09'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.28;
+      }
+
+      .hero::after {
+        content: '';
+        position: absolute;
+        width: 280px;
+        height: 280px;
+        right: -90px;
+        top: -90px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+        animation: heroPulse 8s ease-in-out infinite;
+      }
+
+      @keyframes heroPulse {
+        0%,
+        100% {
+          transform: scale(0.95);
+          opacity: 0.6;
+        }
+        50% {
+          transform: scale(1.12);
+          opacity: 0.95;
+        }
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(1.85rem, 4vw, 2.7rem);
+        letter-spacing: 0.01em;
+        font-weight: 800;
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero p {
+        margin: 10px 0 0;
+        max-width: 760px;
+        color: #dbeafe;
+        line-height: 1.55;
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero-metrics {
+        margin-top: 18px;
+        display: grid;
+        gap: 12px;
+        position: relative;
+        z-index: 1;
+      }
+
+      @media (min-width: 760px) {
+        .hero-metrics {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      .metric-tile {
+        border: 1px solid rgba(169, 193, 255, 0.3);
+        border-radius: 14px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(6px);
+      }
+
+      .metric-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #dbeafe;
+      }
+
+      .metric-value {
+        margin-top: 2px;
+        font-family: 'Syne', sans-serif;
+        font-size: 1.5rem;
+      }
+
+      .sparkline {
+        width: 100%;
+        height: 28px;
+        margin-top: 8px;
+      }
+
+      .sparkline path {
+        fill: none;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      @media (min-width: 980px) {
+        .grid {
+          grid-template-columns: 2.1fr 1fr;
+        }
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        backdrop-filter: blur(12px);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 18px 35px rgba(15, 23, 42, 0.1);
+      }
+
+      .title {
+        margin: 0 0 12px;
+        font-size: 1.05rem;
+        letter-spacing: 0.03em;
+        font-family: 'Inter', sans-serif;
+        color: #0f172a;
+      }
+
+      .toolbar {
+        display: grid;
+        gap: 10px;
+      }
+
+      @media (min-width: 680px) {
+        .toolbar {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      input,
+      select,
+      button,
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(169, 193, 255, 0.38);
+        border-radius: 11px;
+        font: inherit;
+        transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+      }
+
+      input,
+      select,
+      textarea {
+        background: rgba(255, 255, 255, 0.9);
+        color: #0f172a;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: rgba(37, 99, 235, 0.7);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+
+      button {
+        background: linear-gradient(120deg, #2563eb, #7c3aed);
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 20px rgba(37, 99, 235, 0.22);
+      }
+
+      button.secondary {
+        background: rgba(239, 246, 255, 0.9);
+        color: #1e3a8a;
+        border: 1px solid rgba(96, 165, 250, 0.35);
+      }
+
+      button.danger {
+        background: linear-gradient(120deg, #ff7b87, #ff5b73);
+        color: #fff;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .college {
+        border: 1px solid rgba(169, 193, 255, 0.3);
+        border-radius: 14px;
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(239, 246, 255, 0.88));
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: rgba(37, 99, 235, 0.12);
+        color: #1d4ed8;
+        font-size: 0.78rem;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .actions button {
+        width: auto;
+      }
+
+      .audit {
+        max-height: 420px;
+        overflow: auto;
+        padding-right: 6px;
+      }
+
+      .audit-item {
+        border-bottom: 1px dashed rgba(169, 193, 255, 0.25);
+        padding: 10px 0;
+      }
+
+      .status {
+        margin-top: 10px;
+        color: #1e3a8a;
+        background: rgba(219, 234, 254, 0.6);
+        border: 1px solid rgba(96, 165, 250, 0.32);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+
+      .row {
+        display: grid;
+        gap: 8px;
+      }
+
+      .danger-panel {
+        border-color: rgba(239, 68, 68, 0.34);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(254, 242, 242, 0.92));
+      }
+
+      .lift-card {
+        transform-style: preserve-3d;
+        will-change: transform;
+        transition: transform 0.35s ease, box-shadow 0.35s ease;
+      }
+
+      .lift-card:hover {
+        box-shadow: 0 30px 55px rgba(2, 8, 32, 0.42);
+      }
+
+      .reveal {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .reveal.in {
+        animation: riseIn 520ms cubic-bezier(0.2, 0.9, 0.18, 1) forwards;
+        animation-delay: var(--delay, 0ms);
+      }
+
+      @keyframes riseIn {
+        from {
+          opacity: 0;
+          transform: translateY(24px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .palette-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 8, 23, 0.72);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        z-index: 40;
+        padding: 8vh 14px 14px;
+      }
+
+      .palette-overlay.open {
+        display: flex;
+      }
+
+      .palette {
+        width: min(760px, 100%);
+        border-radius: 18px;
+        border: 1px solid rgba(169, 193, 255, 0.34);
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.98));
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+        overflow: hidden;
+      }
+
+      .palette-input {
+        border: none;
+        border-bottom: 1px solid rgba(169, 193, 255, 0.34);
+        border-radius: 0;
+        padding: 14px;
+        font-size: 1rem;
+      }
+
+      .palette-list {
+        max-height: 320px;
+        overflow: auto;
+      }
+
+      .palette-item {
+        width: 100%;
+        text-align: left;
+        border: none;
+        background: transparent;
+        color: #0f172a;
+        border-radius: 0;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(169, 193, 255, 0.16);
+      }
+
+      .palette-item:hover,
+      .palette-item.active {
+        background: rgba(106, 169, 255, 0.2);
+        box-shadow: none;
+        transform: none;
+      }
+
+      .palette-item small {
+        display: block;
+        color: #64748b;
+      }
+
+      .particles {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 45;
+      }
+
+      .particle {
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        animation: burst 780ms ease-out forwards;
+      }
+
+      @keyframes burst {
+        from {
+          transform: translate(0, 0) scale(1);
+          opacity: 0.95;
+        }
+        to {
+          transform: translate(var(--dx), var(--dy)) scale(0.2);
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="float-layer" aria-hidden="true">
+      <span class="float-orb"></span>
+      <span class="float-orb"></span>
+      <span class="float-orb"></span>
+    </div>
+    <main class="shell">
+      <section class="hero reveal">
+        <h1>Company Master Command Center</h1>
+        <p>
+          Upper-most control surface for all colleges: registry edits, governance approvals, links,
+          and incident operations with dual-approval workflow.
+        </p>
+        <div class="hero-metrics">
+          <div class="metric-tile">
+            <div class="metric-label">Active Colleges</div>
+            <div class="metric-value" id="metricColleges" data-target="0">0</div>
+            <svg class="sparkline" viewBox="0 0 120 28" preserveAspectRatio="none">
+              <path id="sparkColleges" stroke="#38f0d3"></path>
+            </svg>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-label">Privileged Requests</div>
+            <div class="metric-value" id="metricRequests" data-target="0">0</div>
+            <svg class="sparkline" viewBox="0 0 120 28" preserveAspectRatio="none">
+              <path id="sparkRequests" stroke="#6aa9ff"></path>
+            </svg>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-label">Audit Events</div>
+            <div class="metric-value" id="metricAudit" data-target="0">0</div>
+            <svg class="sparkline" viewBox="0 0 120 28" preserveAspectRatio="none">
+              <path id="sparkAudit" stroke="#ffc44f"></path>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card lift-card reveal" style="--delay: 80ms">
+          <h2 class="title">College Registry</h2>
+          <div class="toolbar">
+            <input id="apiKey" placeholder="x-platform-key" value="owner-local-key" />
+            <input id="actor" placeholder="x-platform-actor" value="platform-owner" />
+            <div class="actions">
+              <button id="loadBtn">Load Colleges</button>
+              <button class="secondary" id="loadAuditBtn">Load Audit</button>
+            </div>
+          </div>
+          <p class="status" id="status">Ready.</p>
+          <div class="list" id="collegeList"></div>
+        </article>
+
+        <aside>
+          <article class="card danger-panel lift-card reveal" style="--delay: 140ms">
+            <h2 class="title">Privileged Action Request</h2>
+            <div class="row">
+              <input id="actionCollegeId" placeholder="College UUID" />
+              <select id="actionType">
+                <option value="suspend_college">Suspend College</option>
+                <option value="activate_college">Activate College</option>
+                <option value="transfer_ownership">Transfer Ownership</option>
+                <option value="rotate_links">Rotate Links</option>
+                <option value="emergency_read_only">Emergency Read Only</option>
+              </select>
+              <input id="reasonCode" placeholder="Reason code" value="security-incident" />
+              <input id="referenceId" placeholder="Reference ID" value="INC-100" />
+              <button class="danger" id="requestActionBtn">Create Request</button>
+            </div>
+          </article>
+
+          <article class="card lift-card reveal" style="margin-top: 16px; --delay: 210ms">
+            <h2 class="title">Audit Vault</h2>
+            <div class="audit" id="auditList"></div>
+          </article>
+        </aside>
+      </section>
+    </main>
+
+    <div class="palette-overlay" id="paletteOverlay" aria-hidden="true">
+      <div class="palette">
+        <input
+          class="palette-input"
+          id="paletteInput"
+          placeholder="Run command... (ex: suspend selected college)"
+        />
+        <div class="palette-list" id="paletteList"></div>
+      </div>
+    </div>
+
+    <div class="particles" id="particles"></div>
+
+    <script>
+      const statusEl = document.getElementById('status');
+      const collegeListEl = document.getElementById('collegeList');
+      const auditListEl = document.getElementById('auditList');
+      const particlesEl = document.getElementById('particles');
+      const paletteOverlayEl = document.getElementById('paletteOverlay');
+      const paletteInputEl = document.getElementById('paletteInput');
+      const paletteListEl = document.getElementById('paletteList');
+
+      const metricsState = {
+        colleges: 0,
+        requests: 0,
+        audit: 0,
+      };
+
+      const appState = {
+        colleges: [],
+        selectedCollegeId: null,
+      };
+
+      const getHeaders = () => ({
+        'Content-Type': 'application/json',
+        'x-platform-key': document.getElementById('apiKey').value,
+        'x-platform-actor': document.getElementById('actor').value || 'platform-owner',
+      });
+
+      const updateStatus = (message) => {
+        statusEl.textContent = message;
+      };
+
+      function animateCounter(elementId, value) {
+        const el = document.getElementById(elementId);
+        const current = Number(el.dataset.target || 0);
+        const next = Number(value || 0);
+        el.dataset.target = String(next);
+
+        const start = performance.now();
+        const duration = 680;
+        function frame(ts) {
+          const p = Math.min((ts - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(current + (next - current) * eased).toLocaleString();
+          if (p < 1) {
+            requestAnimationFrame(frame);
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function renderSparkline(pathId, values) {
+        const path = document.getElementById(pathId);
+        if (!values || values.length < 2) {
+          path.setAttribute('d', 'M0 20 L120 20');
+          return;
+        }
+
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = Math.max(max - min, 1);
+
+        const points = values.map((v, i) => {
+          const x = (i / (values.length - 1)) * 120;
+          const y = 24 - ((v - min) / range) * 20;
+          return `${x.toFixed(2)} ${y.toFixed(2)}`;
+        });
+
+        path.setAttribute('d', `M${points.join(' L')}`);
+      }
+
+      function updateMetrics() {
+        animateCounter('metricColleges', metricsState.colleges);
+        animateCounter('metricRequests', metricsState.requests);
+        animateCounter('metricAudit', metricsState.audit);
+
+        renderSparkline('sparkColleges', [2, 3, 2, 4, 5, 4, metricsState.colleges]);
+        renderSparkline('sparkRequests', [1, 1, 2, 3, 2, 4, metricsState.requests]);
+        renderSparkline('sparkAudit', [3, 6, 5, 8, 7, 10, metricsState.audit]);
+      }
+
+      function initRevealAnimations() {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('in');
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.12 }
+        );
+
+        document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+      }
+
+      function bindAntiGravityMotion() {
+        const cards = document.querySelectorAll('.lift-card');
+        cards.forEach((card) => {
+          if (card.dataset.motionBound === '1') {
+            return;
+          }
+          card.dataset.motionBound = '1';
+
+          card.addEventListener('mousemove', (event) => {
+            const rect = card.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width - 0.5;
+            const y = (event.clientY - rect.top) / rect.height - 0.5;
+            const rotateX = y * -6;
+            const rotateY = x * 8;
+            const lift = -8;
+            card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(${lift}px)`;
+          });
+
+          card.addEventListener('mouseleave', () => {
+            card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0px)';
+          });
+        });
+      }
+
+      function burstParticles(x, y, color) {
+        for (let i = 0; i < 22; i += 1) {
+          const p = document.createElement('span');
+          p.className = 'particle';
+          p.style.left = `${x}px`;
+          p.style.top = `${y}px`;
+          p.style.background = color || ['#38f0d3', '#6aa9ff', '#ffc44f'][i % 3];
+          const angle = (Math.PI * 2 * i) / 22;
+          const distance = 30 + Math.random() * 90;
+          p.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+          p.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+          particlesEl.appendChild(p);
+          setTimeout(() => p.remove(), 820);
+        }
+      }
+
+      function executePaletteCommand(command) {
+        const map = {
+          'Load colleges': () => loadColleges(),
+          'Load audit logs': () => loadAudit(),
+          'Focus privileged request form': () => document.getElementById('actionCollegeId').focus(),
+          'Use selected college in request': () => {
+            if (!appState.selectedCollegeId) {
+              updateStatus('No college selected yet. Click Activate or Suspend on a college first.');
+              return;
+            }
+            document.getElementById('actionCollegeId').value = appState.selectedCollegeId;
+            updateStatus(`Selected college injected: ${appState.selectedCollegeId}`);
+          },
+          'Emergency read-only request': async () => {
+            if (!appState.selectedCollegeId) {
+              updateStatus('Select a college first from registry actions.');
+              return;
+            }
+            document.getElementById('actionCollegeId').value = appState.selectedCollegeId;
+            document.getElementById('actionType').value = 'emergency_read_only';
+            await createActionRequest();
+          },
+        };
+
+        const run = map[command];
+        if (run) {
+          run();
+        }
+        togglePalette(false);
+      }
+
+      const paletteCommands = [
+        {
+          title: 'Load colleges',
+          description: 'Refresh global college registry',
+        },
+        {
+          title: 'Load audit logs',
+          description: 'Refresh immutable audit vault',
+        },
+        {
+          title: 'Focus privileged request form',
+          description: 'Jump to UUID input immediately',
+        },
+        {
+          title: 'Use selected college in request',
+          description: 'Inject selected college ID into action form',
+        },
+        {
+          title: 'Emergency read-only request',
+          description: 'Create high-priority emergency request',
+        },
+      ];
+
+      function renderPalette(filter = '') {
+        const q = filter.toLowerCase().trim();
+        const items = paletteCommands.filter(
+          (item) => item.title.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
+        );
+        paletteListEl.innerHTML = '';
+
+        items.forEach((item, idx) => {
+          const button = document.createElement('button');
+          button.className = `palette-item ${idx === 0 ? 'active' : ''}`;
+          button.type = 'button';
+          button.dataset.command = item.title;
+          button.innerHTML = `${item.title}<small>${item.description}</small>`;
+          button.addEventListener('click', () => executePaletteCommand(item.title));
+          paletteListEl.appendChild(button);
+        });
+      }
+
+      function togglePalette(open) {
+        paletteOverlayEl.classList.toggle('open', open);
+        paletteOverlayEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+        if (open) {
+          renderPalette();
+          paletteInputEl.value = '';
+          setTimeout(() => paletteInputEl.focus(), 20);
+        }
+      }
+
+      function initCommandPalette() {
+        document.addEventListener('keydown', (event) => {
+          const isPaletteHotkey = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+          if (isPaletteHotkey) {
+            event.preventDefault();
+            togglePalette(!paletteOverlayEl.classList.contains('open'));
+          }
+          if (event.key === 'Escape') {
+            togglePalette(false);
+          }
+          if (event.key === 'Enter' && paletteOverlayEl.classList.contains('open')) {
+            const active = paletteListEl.querySelector('.palette-item.active');
+            if (active) {
+              executePaletteCommand(active.dataset.command);
+            }
+          }
+        });
+
+        paletteOverlayEl.addEventListener('click', (event) => {
+          if (event.target === paletteOverlayEl) {
+            togglePalette(false);
+          }
+        });
+
+        paletteInputEl.addEventListener('input', (event) => {
+          renderPalette(event.target.value);
+        });
+
+        paletteListEl.addEventListener('mouseover', (event) => {
+          const target = event.target.closest('.palette-item');
+          if (!target) {
+            return;
+          }
+          paletteListEl.querySelectorAll('.palette-item').forEach((item) => item.classList.remove('active'));
+          target.classList.add('active');
+        });
+      }
+
+      async function loadColleges() {
+        updateStatus('Loading colleges...');
+        const res = await fetch('/api/colleges', { headers: getHeaders() });
+        if (!res.ok) {
+          updateStatus('Failed to load colleges. Check key.');
+          return;
+        }
+        const data = await res.json();
+        appState.colleges = data.items;
+        metricsState.colleges = data.items.filter((item) => item.status === 'active').length;
+        updateMetrics();
+        collegeListEl.innerHTML = '';
+
+        data.items.forEach((college) => {
+          const item = document.createElement('div');
+          item.className = 'college lift-card reveal';
+          item.innerHTML = `
+            <div>
+              <strong>${college.name}</strong>
+              <span class="badge">${college.status}</span>
+            </div>
+            <div class="meta">${college.code} • ${college.region} • ${college.contactEmail}</div>
+            <div class="meta">Domain: ${college.domain}</div>
+            <div class="actions">
+              <button class="secondary" data-id="${college.id}" data-next="active">Activate</button>
+              <button class="danger" data-id="${college.id}" data-next="suspended">Suspend</button>
+            </div>
+          `;
+
+          item.querySelectorAll('button[data-id]').forEach((btn) => {
+            btn.addEventListener('click', async (event) => {
+              const collegeId = btn.getAttribute('data-id');
+              const nextStatus = btn.getAttribute('data-next');
+              appState.selectedCollegeId = collegeId;
+              const patchResponse = await fetch(`/api/colleges/${collegeId}`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify({ status: nextStatus }),
+              });
+
+              if (patchResponse.ok) {
+                const rect = event.currentTarget.getBoundingClientRect();
+                burstParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, '#6aa9ff');
+              }
+
+              loadColleges();
+            });
+          });
+
+          collegeListEl.appendChild(item);
+        });
+
+        initRevealAnimations();
+        bindAntiGravityMotion();
+
+        updateStatus(`Loaded ${data.count} colleges.`);
+      }
+
+      async function loadAudit() {
+        const res = await fetch('/api/governance/audit?limit=30', { headers: getHeaders() });
+        if (!res.ok) {
+          auditListEl.innerHTML = '<div class="audit-item">Could not load audit logs.</div>';
+          return;
+        }
+
+        const data = await res.json();
+        metricsState.audit = data.count;
+        updateMetrics();
+        auditListEl.innerHTML = '';
+        data.items.forEach((row) => {
+          const item = document.createElement('div');
+          item.className = 'audit-item';
+          item.innerHTML = `<strong>${row.action}</strong><div class="meta">${row.actor} • ${row.detail}</div>`;
+          auditListEl.appendChild(item);
+        });
+      }
+
+      async function createActionRequest() {
+        const payload = {
+          collegeId: document.getElementById('actionCollegeId').value,
+          action: document.getElementById('actionType').value,
+          reasonCode: document.getElementById('reasonCode').value,
+          referenceId: document.getElementById('referenceId').value,
+        };
+
+        const res = await fetch('/api/governance/actions/request', {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          updateStatus('Failed to create request. Check payload.');
+          return;
+        }
+
+        const data = await res.json();
+        metricsState.requests += 1;
+        updateMetrics();
+
+        const buttonRect = document.getElementById('requestActionBtn').getBoundingClientRect();
+        burstParticles(buttonRect.left + buttonRect.width / 2, buttonRect.top + buttonRect.height / 2, '#38f0d3');
+
+        updateStatus(`Action request created: ${data.id}`);
+        loadAudit();
+      }
+
+      document.getElementById('loadBtn').addEventListener('click', loadColleges);
+      document.getElementById('loadAuditBtn').addEventListener('click', loadAudit);
+      document.getElementById('requestActionBtn').addEventListener('click', createActionRequest);
+
+      initRevealAnimations();
+      bindAntiGravityMotion();
+      initCommandPalette();
+      updateMetrics();
+
+      loadColleges().catch(() => updateStatus('Unable to initialize dashboard.'));
+      loadAudit().catch(() => {});
+    </script>
+  </body>
+</html>

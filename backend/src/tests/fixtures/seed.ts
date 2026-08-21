@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
 import { v4 as uuid } from 'uuid';
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+dotenv.config({ path: '.env' });
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 export interface TestUser {
   id: string;
@@ -28,6 +31,11 @@ function generateTestEmail(prefix: string): string {
 export async function seedTestData() {
   const testUsers: Record<string, TestUser> = {};
   const testStudents: Record<string, TestStudent> = {};
+
+  if (!supabase) {
+    console.warn('Supabase credentials missing; skipping test data seeding.');
+    return { testUsers, testStudents };
+  }
 
   try {
     // Create test student
@@ -134,6 +142,10 @@ export async function seedTestData() {
 }
 
 export async function cleanupTestData(testUsers: Record<string, TestUser>) {
+  if (!supabase) {
+    return;
+  }
+
   try {
     // Delete students associated with test users
     for (const user of Object.values(testUsers)) {

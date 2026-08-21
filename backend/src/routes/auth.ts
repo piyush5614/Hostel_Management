@@ -23,7 +23,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     const db = await getDb();
 
     // Check if the user already exists (by email or by generated_id)
-    let existingQuery = db
+    const existingQuery = db
       .from('users')
       .select('id, email')
       .eq('college_id', collegeId)
@@ -157,7 +157,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const db = await getDb();
 
     // Try matching by email first
-    let { data: users, error: selectErr } = await db
+    const { data: users, error: selectErr } = await db
       .from('users')
       .select('*')
       .eq('college_id', collegeId)

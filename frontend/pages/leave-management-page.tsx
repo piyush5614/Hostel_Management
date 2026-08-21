@@ -104,7 +104,7 @@ export function LeaveManagementPage() {
   const fetchStudentLeaves = useCallback(async (cursor?: string): Promise<PaginatedResponse<LeaveRequest>> => {
     try {
       // TODO: Replace with actual API call: /api/leave?limit=50&cursor=${cursor}&type=student
-      let result = visibleStudentLeaves;
+      const result = visibleStudentLeaves;
 
       // Simulate cursor-based pagination
       const pageSize = 50;
@@ -133,7 +133,7 @@ export function LeaveManagementPage() {
   const fetchStaffLeaves = useCallback(async (cursor?: string): Promise<PaginatedResponse<StaffLeaveRequest>> => {
     try {
       // TODO: Replace with actual API call: /api/leave?limit=50&cursor=${cursor}&type=staff
-      let result = visibleStaffLeaves;
+      const result = visibleStaffLeaves;
 
       // Simulate cursor-based pagination
       const pageSize = 50;

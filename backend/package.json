@@ -9,8 +9,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "test:api": "vitest run --include src/tests/routes/*.test.ts",
-    "test:integration": "vitest --include src/tests/**/*.test.ts"
+    "test:api": "vitest run src/tests/routes/",
+    "test:integration": "vitest src/tests/"
   },
   "dependencies": {
     "@sentry/node": "^7.120.4",
