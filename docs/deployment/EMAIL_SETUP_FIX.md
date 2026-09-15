@@ -22,10 +22,10 @@ SUPABASE_SERVICE_ROLE_KEY=your-api-key
 ---
 
 ## Email Configuration (Gmail)
-Your `.env` is **correctly configured** with Gmail credentials:
-- ✅ GMAIL_USER: akumamadan@gmail.com
-- ✅ GMAIL_APP_PASSWORD: vuwskcpjspoetjtp
-- ✅ APP_URL: http://localhost:5173
+Configure Gmail credentials locally in the ignored `.env` file. Never commit or document a real Gmail address or app password.
+- GMAIL_USER: your_email@gmail.com
+- GMAIL_APP_PASSWORD: xxxx-xxxx-xxxx-xxxx
+- APP_URL: http://localhost:5173
 
 **Note:** Once the backend starts, emails will send via the `/api/email/task-notify` endpoint.
 

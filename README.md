@@ -55,6 +55,8 @@ hostel-connect/
 npm install
 ```
 
+Do not zip or share `node_modules`; it contains OS-specific native binaries. On every new machine or operating system, remove any existing dependency directory and run `npm install` again.
+
 ### 2. Configure Environment Variables
 ```bash
 cp .env.example .env

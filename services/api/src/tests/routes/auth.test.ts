@@ -1,166 +1,46 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import express from 'express';
 import request from 'supertest';
-import { seedTestData, cleanupTestData } from '../fixtures/seed';
-import dotenv from 'dotenv';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { resetTestDb, testDb } from '../fixtures/in-memory-db.js';
+import authRoutes from '../../routes/auth.js';
 
-dotenv.config({ path: '.env' });
+vi.mock('../../db/init.js', () => ({ getDb: async () => testDb }));
 
-const baseURL = 'http://localhost:3001';
+const app = express();
+app.use(express.json());
+app.use('/api/auth', authRoutes);
 
-// Skip these integration tests if backend is not running or Supabase is not configured
-// These tests require a running backend with proper Supabase configuration
-describe.skip('Auth Routes', () => {
-  let testData: Awaited<ReturnType<typeof seedTestData>>;
-
+describe('Auth Routes', () => {
   beforeAll(async () => {
-    testData = await seedTestData();
-    console.log('Test data seeded:', Object.keys(testData.testUsers));
+    await resetTestDb();
   });
 
-  afterAll(async () => {
-    await cleanupTestData(testData.testUsers);
-    console.log('Test data cleaned up');
+  it('logs in with valid credentials', async () => {
+    const response = await request(app).post('/api/auth/login').send({ email: 'student@test.local', password: 'TestPassword123!' });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(expect.objectContaining({ token: expect.any(String), user: expect.any(Object) }));
   });
 
-  describe('POST /auth/login', () => {
-    it('should login with valid credentials', async () => {
-      const student = testData.testUsers['student'];
-      
-      if (!student) {
-        expect.fail('Student test user not created');
-      }
-
-      const response = await request(baseURL)
-        .post('/auth/login')
-        .send({
-          email: student.email,
-          password: student.password,
-        });
-
-      expect([200, 201]).toContain(response.status);
-      expect(response.body).toHaveProperty('token');
-      expect(response.body).toHaveProperty('user');
-      expect(response.body.user.email).toBe(student.email);
-    });
-
-    it('should reject invalid password', async () => {
-      const student = testData.testUsers['student'];
-      
-      if (!student) {
-        expect.fail('Student test user not created');
-      }
-
-      const response = await request(baseURL)
-        .post('/auth/login')
-        .send({
-          email: student.email,
-          password: 'WrongPassword123!',
-        });
-
-      expect([401, 400]).toContain(response.status);
-    });
-
-    it('should reject non-existent user', async () => {
-      const response = await request(baseURL)
-        .post('/auth/login')
-        .send({
-          email: 'nonexistent@test.com',
-          password: 'AnyPassword123!',
-        });
-
-      expect([401, 400]).toContain(response.status);
-    });
+  it('rejects invalid credentials', async () => {
+    const response = await request(app).post('/api/auth/login').send({ email: 'student@test.local', password: 'wrong-password' });
+    expect(response.status).toBe(401);
   });
 
-  describe('POST /auth/register', () => {
-    it('should register new user', async () => {
-      const response = await request(baseURL)
-        .post('/auth/register')
-        .send({
-          email: `newuser_${Date.now()}@test.com`,
-          password: 'SecurePass123!',
-          role: 'student',
-        });
-
-      expect([201, 200]).toContain(response.status);
-      expect(response.body).toHaveProperty('user');
-    });
-
-    it('should reject duplicate email', async () => {
-      const student = testData.testUsers['student'];
-      
-      if (!student) {
-        expect.fail('Student test user not created');
-      }
-
-      const response = await request(baseURL)
-        .post('/auth/register')
-        .send({
-          email: student.email,
-          password: 'AnyPassword123!',
-          role: 'student',
-        });
-
-      expect([400, 409]).toContain(response.status);
-    });
-
-    it('should reject weak password', async () => {
-      const response = await request(baseURL)
-        .post('/auth/register')
-        .send({
-          email: `weakpass_${Date.now()}@test.com`,
-          password: 'weak',
-          role: 'student',
-        });
-
-      expect([400, 422]).toContain(response.status);
-    });
+  it('rejects missing credentials', async () => {
+    const response = await request(app).post('/api/auth/login').send({ email: 'student@test.local' });
+    expect(response.status).toBe(400);
   });
 
-  describe('GET /auth/verify (Token verification)', () => {
-    it('should verify valid token', async () => {
-      const student = testData.testUsers['student'];
-      
-      if (!student) {
-        expect.fail('Student test user not created');
-      }
-
-      // First login to get token
-      const loginResponse = await request(baseURL)
-        .post('/auth/login')
-        .send({
-          email: student.email,
-          password: student.password,
-        });
-
-      if (loginResponse.status !== 200 && loginResponse.status !== 201) {
-        expect.fail('Failed to login for token verification test');
-      }
-
-      const token = loginResponse.body.token;
-
-      // Verify token
-      const verifyResponse = await request(baseURL)
-        .get('/auth/verify')
-        .set('Authorization', `Bearer ${token}`);
-
-      expect([200, 201]).toContain(verifyResponse.status);
-      expect(verifyResponse.body).toHaveProperty('user');
+  it('registers a new user and returns a token', async () => {
+    const response = await request(app).post('/api/auth/signup').send({
+      email: 'new-user@test.local', password: 'SecurePass123!', name: 'New User', role: 'student',
     });
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(expect.objectContaining({ token: expect.any(String), user: expect.any(Object) }));
+  });
 
-    it('should reject missing token', async () => {
-      const response = await request(baseURL)
-        .get('/auth/verify');
-
-      expect([401, 403]).toContain(response.status);
-    });
-
-    it('should reject invalid token', async () => {
-      const response = await request(baseURL)
-        .get('/auth/verify')
-        .set('Authorization', 'Bearer invalid_token_123');
-
-      expect([401, 403]).toContain(response.status);
-    });
+  it('rejects unauthenticated user lookup', async () => {
+    const response = await request(app).get('/api/auth/me');
+    expect(response.status).toBe(401);
   });
 });

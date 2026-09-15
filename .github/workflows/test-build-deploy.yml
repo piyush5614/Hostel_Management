@@ -35,17 +35,38 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+
+      - name: Reject staged environment files
+        run: node scripts/check-staged-env.mjs
       
-      - name: Lint code
-        run: npm run lint --if-present || true
+      - name: Lint frontend
+        working-directory: ./apps/web
+        run: npm run lint
+
+      - name: Typecheck frontend
+        working-directory: ./apps/web
+        run: npm run typecheck
+
+      - name: Lint API
+        working-directory: ./services/api
+        run: npm run lint
+
+      - name: Typecheck API
+        working-directory: ./services/api
+        run: npm run typecheck
       
       - name: Run frontend tests
-        run: npm run test:ui
+        working-directory: ./apps/web
+        run: npm run test -- --run
       
-      - name: Run backend tests
-        working-directory: ./backend
-        run: npm test
+      - name: Run API tests
+        working-directory: ./services/api
+        run: npm run test -- --run
+
+      - name: Run API auth and leave integration tests
+        working-directory: ./services/api
+        run: npm run test:integration
       
       - name: Upload coverage
         uses: codecov/codecov-action@v3
@@ -75,13 +96,14 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       
       - name: Build frontend
+        working-directory: ./apps/web
         run: npm run build
       
-      - name: Build backend
-        working-directory: ./backend
+      - name: Build API
+        working-directory: ./services/api
         run: npm run build
       
       - name: Upload build artifacts
@@ -90,7 +112,8 @@ jobs:
           name: dist
           path: |
             dist/
-            backend/dist/
+            apps/web/dist/
+            services/api/dist/
           retention-days: 7
 
   docker:
@@ -132,7 +155,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./backend/Dockerfile
+          file: ./services/api/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
