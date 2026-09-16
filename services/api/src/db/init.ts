@@ -2,6 +2,18 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { log } from '../utils/logger.js';
 
 let supabaseClient: SupabaseClient | null = null;
+const SUPABASE_REQUEST_TIMEOUT_MS = 10000;
+
+async function fetchWithTimeout(input: string | URL | Request, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SUPABASE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Initialize Supabase Client
@@ -24,6 +36,9 @@ export async function initDb(): Promise<SupabaseClient> {
   }
 
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
+    global: {
+      fetch: fetchWithTimeout,
+    },
     auth: {
       autoRefreshToken: false,
       persistSession: false,

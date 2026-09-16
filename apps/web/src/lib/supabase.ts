@@ -20,6 +20,18 @@ const credentialRegistry: RegisteredCredential[] = [];
 
 const DEFAULT_COLLEGE_ID = (import.meta.env.VITE_DEFAULT_COLLEGE_ID as string | undefined) || 'college-default';
 const ACTIVE_COLLEGE_STORAGE_KEY = 'tc-hostel-active-college-id';
+const API_REQUEST_TIMEOUT_MS = 8000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 
 function setActiveCollegeId(collegeId?: string): void {
   if (typeof window === 'undefined' || !collegeId?.trim()) {
@@ -117,7 +129,7 @@ interface BackendLoginResult {
 async function backendLogin(identifier: string, password: string): Promise<BackendLoginResult | null> {
   try {
     const collegeId = getActiveCollegeId();
-    const res = await fetch('/api/auth/login', {
+    const res = await fetchWithTimeout('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -297,8 +309,8 @@ export const supabase = {
       console.log('⚠️  Backend unavailable – falling back to mock auth');
       await new Promise(resolve => setTimeout(resolve, 400));
 
-      // Try built-in demo accounts
-      let user = MOCK_USERS.find(u => u.email === identifier && u.password === password);
+      // Demo account sign-in is temporarily disabled. Existing demo data is preserved.
+      let user: typeof MOCK_USERS[number] | undefined;
 
       // Try credential registry
       if (!user) {
@@ -496,7 +508,7 @@ export const getUserProfile = async (authId: string) => {
       const session = JSON.parse(stored);
       const token = session?.access_token;
       if (token && token !== 'mock-access-token') {
-        const res = await fetch('/api/auth/me', {
+        const res = await fetchWithTimeout('/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {

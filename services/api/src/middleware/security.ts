@@ -124,6 +124,9 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
  * Combines all security-related middleware
  */
 export function applySecurityMiddleware(app: any) {
+  // Configure proxy handling before rate limiters inspect the client IP.
+  app.set('trust proxy', 1);
+
   // Add security headers
   app.use(securityHeaders);
 
@@ -149,11 +152,11 @@ export function applySecurityMiddleware(app: any) {
     next();
   });
 
-  // Add general API rate limiting
-  app.use('/api/', apiLimiter);
-
-  // Trust proxy - important for rate limiting behind reverse proxy
-  app.set('trust proxy', 1);
+  // Rate limiting is enabled in production. Local development should not block
+  // requests while the app is running behind Vite's proxy.
+  if (process.env.NODE_ENV === 'production') {
+    app.use('/api/', apiLimiter);
+  }
 }
 
 /**

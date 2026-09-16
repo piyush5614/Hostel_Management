@@ -5,6 +5,7 @@ import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
 import { authenticate, getRequestCollegeId } from '../middleware/auth.js';
 import { resolveCollegeId } from '../utils/tenant.js';
 import { log } from '../utils/logger.js';
+import { findLocalAuthUser, updateLocalLastLogin } from '../db/local-auth.js';
 
 const router = Router();
 
@@ -163,6 +164,38 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       .eq('college_id', collegeId)
       .eq('email', email)
       .eq('is_active', true);
+
+    // Local development databases predate the Supabase migration. Keep login
+    // usable until the project migrations are applied to the remote database.
+    if (selectErr?.code === 'PGRST205') {
+      const localUser = await findLocalAuthUser(email);
+      if (!localUser || !(await comparePassword(password, localUser.password))) {
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      await updateLocalLastLogin(localUser.id);
+      const collegeId = resolveCollegeId(localUser.college_id);
+      const token = generateToken({ userId: localUser.id, email: localUser.email, role: localUser.role, collegeId });
+      log.auth('Local database login successful', localUser.id, email);
+      res.json({
+        user: {
+          id: localUser.id,
+          email: localUser.email,
+          name: localUser.name,
+          role: localUser.role,
+          college_id: collegeId,
+          generated_id: localUser.generated_id,
+          profile_image: localUser.profile_image,
+        },
+        token,
+      });
+      return;
+    }
+
+    if (selectErr) {
+      throw selectErr;
+    }
 
     let user = users && users.length > 0 ? users[0] : null;
 

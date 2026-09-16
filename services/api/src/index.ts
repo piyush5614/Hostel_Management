@@ -33,6 +33,11 @@ import { createNotificationRoutes } from './routes/notifications.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Keep liveness checks independent of authentication, rate limiting, and database work.
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Initialize Sentry for error tracking (if DSN is configured)
 initSentry();
 
@@ -40,7 +45,7 @@ initSentry();
 applySecurityMiddleware(app);
 
 // Apply Sentry request handler (captures request info)
-app.use(sentryRequestHandler);
+app.use(sentryRequestHandler());
 
 // Apply compression middleware (reduces response size 60-80%)
 app.use(compressionMiddleware);
@@ -58,8 +63,10 @@ app.get('/api-docs.json', (req, res) => {
   res.send(swaggerSpec);
 });
 
-// Apply rate limiting to auth endpoints
-app.use('/api/auth/login', loginLimiter);
+// Apply strict auth rate limiting in production only.
+if (process.env.NODE_ENV === 'production') {
+  app.use('/api/auth/login', loginLimiter);
+}
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/rooms', roomRoutes);
@@ -78,12 +85,8 @@ const httpServer = http.createServer(app);
 const io = initializeSocket(httpServer);
 app.use('/api/notifications', createNotificationRoutes(io));
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
 // Apply Sentry error handler (captures errors from routes)
-app.use(sentryErrorHandler);
+app.use(sentryErrorHandler());
 
 // Global error handler (must be last)
 app.use(errorHandler);

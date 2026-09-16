@@ -326,20 +326,9 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {/* Enhanced demo accounts section */}
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-gray-600" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-gradient-to-r from-white to-gray-50 dark:from-card dark:to-card px-4 py-1 text-muted-foreground font-bold tracking-widest rounded-full border border-gray-200 dark:border-gray-700">
-                  Demo Accounts
-                </span>
-              </div>
-            </div>
-            
-            <div className="mt-6 grid grid-cols-2 gap-3">
+          {/* Demo account controls are temporarily hidden. */}
+          {/*
+            <div className="mt-8">
               <Button 
                 type="button"
                 variant="outline" 
@@ -428,7 +417,7 @@ export function LoginPage() {
                 </p>
               </div>
             </div>
-          </div>
+          */}
 
           {/* Enhanced help section */}
           <div className="mt-8 text-center">
