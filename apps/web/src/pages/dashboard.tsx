@@ -18,6 +18,12 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const userRole = user?.role || 'student';
+  console.log('🔎 Dashboard diagnostic: first render', {
+    userId: user?.id,
+    email: user?.email,
+    role: user?.role,
+    collegeId: user?.collegeId,
+  });
   const refreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED, EVENTS.LEAVE_UPDATED, EVENTS.TASK_UPDATED, EVENTS.ATTENDANCE_UPDATED, EVENTS.ROOM_UPDATED, EVENTS.STAFF_UPDATED]);
   const stats = useMemo(() => getDashboardStats(), [refreshKey]);
 

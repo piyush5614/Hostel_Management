@@ -19,6 +19,12 @@ describe('Auth Routes', () => {
     const response = await request(app).post('/api/auth/login').send({ email: 'student@test.local', password: 'TestPassword123!' });
     expect(response.status).toBe(200);
     expect(response.body).toEqual(expect.objectContaining({ token: expect.any(String), user: expect.any(Object) }));
+    expect(response.body.user).toEqual(expect.objectContaining({
+      email: 'student@test.local',
+      role: 'student',
+      college_id: 'college-default',
+      is_active: true,
+    }));
   });
 
   it('rejects invalid credentials', async () => {
@@ -37,6 +43,24 @@ describe('Auth Routes', () => {
     });
     expect(response.status).toBe(201);
     expect(response.body).toEqual(expect.objectContaining({ token: expect.any(String), user: expect.any(Object) }));
+    expect(response.body.user).toEqual(expect.objectContaining({
+      email: 'new-user@test.local',
+      role: 'student',
+      college_id: 'college-default',
+      is_active: true,
+    }));
+
+    const loginResponse = await request(app).post('/api/auth/login').send({
+      email: 'new-user@test.local',
+      password: 'SecurePass123!',
+    });
+    expect(loginResponse.status).toBe(200);
+    expect(loginResponse.body.user).toEqual(expect.objectContaining({
+      email: 'new-user@test.local',
+      role: 'student',
+      college_id: 'college-default',
+      is_active: true,
+    }));
   });
 
   it('rejects unauthenticated user lookup', async () => {

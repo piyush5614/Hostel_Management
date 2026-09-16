@@ -39,6 +39,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isLoading = useAuthStore((state) => state.isLoading);
   const error = useAuthStore((state) => state.error);
+  const logout = useAuthStore((state) => state.logout);
   
   if (isLoading) {
     return (
@@ -59,6 +60,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  if (!useAuthStore.getState().user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="max-w-md space-y-4 text-center">
+          <h1 className="text-xl font-semibold">Your profile could not be loaded</h1>
+          <p className="text-muted-foreground">The account is authenticated, but its profile data is incomplete.</p>
+          <button className="rounded-md bg-primary-600 px-4 py-2 text-white" onClick={() => void logout()}>
+            Sign out and return to login
+          </button>
+        </div>
+      </div>
+    );
+  }
   
   return <>{children}</>;
 };
@@ -74,12 +89,14 @@ function App() {
   // Show loading screen during initial authentication check
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading application...</p>
+      <ErrorBoundary>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading application...</p>
+          </div>
         </div>
-      </div>
+      </ErrorBoundary>
     );
   }
   

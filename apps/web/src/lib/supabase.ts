@@ -137,8 +137,16 @@ async function backendLogin(identifier: string, password: string): Promise<Backe
       },
       body: JSON.stringify({ email: identifier, password, collegeId }),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as BackendLoginResult;
+    if (!res.ok) {
+      console.error('🔎 Auth diagnostic: backend login rejected', { status: res.status });
+      return null;
+    }
+    const result = (await res.json()) as BackendLoginResult;
+    console.log('🔎 Auth diagnostic: backend login resolved', {
+      user: result.user,
+      hasToken: Boolean(result.token),
+    });
+    return result;
   } catch {
     return null; // backend unreachable
   }
@@ -492,12 +500,17 @@ export const getCurrentUser = async () => {
 };
 
 export const getUserProfile = async (authId: string) => {
+  console.log('🔎 Auth diagnostic: getUserProfile started', { authId });
   // 1. Try MOCK_USERS first (instant, works for mock & cached backend users)
   const mockUser = MOCK_USERS.find(u => u.id === authId);
   if (mockUser) {
     const collegeId = mockUser.profile.college_id || getActiveCollegeId();
     mockUser.profile.college_id = collegeId;
     setActiveCollegeId(collegeId);
+    console.log('🔎 Auth diagnostic: getUserProfile resolved from cache', {
+      authId,
+      profile: mockUser.profile,
+    });
     return mockUser.profile;
   }
 
@@ -533,14 +546,20 @@ export const getUserProfile = async (authId: string) => {
             user_metadata: { role: bu.role, college_id: profile.college_id },
             profile,
           });
+          console.log('🔎 Auth diagnostic: getUserProfile resolved from backend', {
+            authId,
+            profile,
+          });
           return profile;
         }
+        console.error('🔎 Auth diagnostic: profile endpoint rejected', { authId, status: res.status });
       }
     }
   } catch {
     // Backend unreachable – fall through
   }
 
+  console.error('🔎 Auth diagnostic: getUserProfile failed', { authId });
   throw new Error('User profile not found');
 };
 

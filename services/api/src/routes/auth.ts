@@ -86,7 +86,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
 
       const token = generateToken({ userId: existingUser.id, email: existingUser.email, role, collegeId });
       res.status(200).json({
-        user: { id: existingUser.id, email: existingUser.email, name, role, college_id: collegeId },
+        user: { id: existingUser.id, email: existingUser.email, name, role, college_id: collegeId, is_active: true },
         token,
       });
       return;
@@ -136,7 +136,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = generateToken({ userId, email, role, collegeId });
-    res.status(201).json({ user: { id: userId, email, name, role, college_id: collegeId }, token });
+    res.status(201).json({ user: { id: userId, email, name, role, college_id: collegeId, is_active: true }, token });
   } catch (error) {
     log.error('Signup error', error, { path: '/signup' });
     res.status(500).json({ error: 'Internal server error' });
@@ -187,6 +187,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
           college_id: collegeId,
           generated_id: localUser.generated_id,
           profile_image: localUser.profile_image,
+          is_active: Boolean(localUser.is_active),
         },
         token,
       });
@@ -246,6 +247,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         college_id: resolvedCollegeId,
         generated_id: user.generated_id,
         profile_image: user.profile_image,
+        is_active: Boolean(user.is_active),
       },
       token,
     });

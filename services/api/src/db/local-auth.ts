@@ -28,7 +28,7 @@ async function getDatabase(): Promise<Database> {
 
 export async function findLocalAuthUser(identifier: string): Promise<LocalAuthUser | null> {
   const database = await getDatabase();
-  return database.get<LocalAuthUser>(
+  const user = await database.get<LocalAuthUser>(
     `SELECT id, email, password, name, role, profile_image, generated_id, college_id, is_active
      FROM users
      WHERE (lower(email) = lower(?) OR lower(generated_id) = lower(?))
@@ -36,7 +36,8 @@ export async function findLocalAuthUser(identifier: string): Promise<LocalAuthUs
      LIMIT 1`,
     identifier,
     identifier,
-  ) || null;
+  );
+  return user || null;
 }
 
 export async function updateLocalLastLogin(userId: string): Promise<void> {

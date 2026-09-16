@@ -37,6 +37,7 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         try {
+          console.log('🔎 Auth diagnostic: login started', { identifier: email.trim() });
           set({ isLoading: true, error: null });
           
           // Enhanced input validation
@@ -95,8 +96,9 @@ export const useAuthStore = create<AuthState>()(
           // Get user profile (mock implementation)
           let userProfile;
           try {
+            console.log('🔎 Auth diagnostic: login loading profile', { authId: authData.user.id });
             userProfile = await getUserProfile(authData.user.id);
-            console.log('✅ User profile found:', userProfile.email);
+            console.log('🔎 Auth diagnostic: login profile resolved', userProfile);
           } catch (profileError: any) {
             console.log('📝 User profile not found, creating new profile...');
             
@@ -128,7 +130,7 @@ export const useAuthStore = create<AuthState>()(
             role: userProfile.role as UserRole,
             collegeId: userProfile.college_id,
             profileImage: userProfile.profile_image,
-            isActive: userProfile.is_active || true,
+            isActive: userProfile.is_active ?? true,
             lastLogin: userProfile.last_login,
           };
 
@@ -140,6 +142,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false, 
             error: null 
           });
+          console.log('🔎 Auth diagnostic: login completed', user);
           
           return user;
         } catch (error: any) {
@@ -187,6 +190,7 @@ export const useAuthStore = create<AuthState>()(
 
       initialize: async () => {
         try {
+          console.log('🔎 Auth diagnostic: initialize started');
           set({ isLoading: true, error: null });
           console.log('🔄 Initializing authentication...');
           
@@ -207,7 +211,9 @@ export const useAuthStore = create<AuthState>()(
             console.log('✅ Active session found for:', session.user.email);
             
             try {
+              console.log('🔎 Auth diagnostic: initialize loading profile', { authId: session.user.id });
               const userProfile = await getUserProfile(session.user.id);
+              console.log('🔎 Auth diagnostic: initialize profile resolved', userProfile);
               
               const user: User = {
                 id: userProfile.id,
@@ -216,7 +222,7 @@ export const useAuthStore = create<AuthState>()(
                 role: userProfile.role as UserRole,
                 collegeId: userProfile.college_id,
                 profileImage: userProfile.profile_image,
-                isActive: userProfile.is_active || true,
+                isActive: userProfile.is_active ?? true,
                 lastLogin: userProfile.last_login,
               };
               
@@ -256,6 +262,7 @@ export const useAuthStore = create<AuthState>()(
               error: null 
             });
           }
+          console.log('🔎 Auth diagnostic: initialize completed');
         } catch (error: any) {
           console.error('❌ Authentication initialization error:', error);
           set({ 
