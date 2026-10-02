@@ -8,6 +8,7 @@
     "build": "tsc",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
+    "create:admin": "tsx scripts/create-admin.ts",
     "start": "node dist/index.js",
     "test": "vitest",
     "test:ui": "vitest --ui",

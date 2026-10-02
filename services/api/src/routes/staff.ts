@@ -19,7 +19,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     let query = db
       .from('staff')
-      .select('*')
+      .select('*, users(id, name, email, profile_image, generated_id, is_active)')
       .eq('college_id', collegeId)
       .order('created_at', { ascending: false });
 
@@ -75,6 +75,10 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
     console.error('Get staff member error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+router.post('/', (_req: Request, res: Response): void => {
+  res.status(410).json({ error: 'Staff accounts must be provisioned by an administrator.' });
 });
 
 router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request, res: Response): Promise<void> => {

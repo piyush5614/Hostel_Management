@@ -73,6 +73,23 @@ npm run dev:api            # Start Express backend
 npm run dev:control-center # Start Company Control Center
 ```
 
+### First-Time Admin Setup
+
+There is no public account-registration route. Create the first administrator from the API workspace using the developer-only seed script. It provisions the Supabase Auth user and its matching application profile; it refuses a second administrator for the same college.
+
+In PowerShell, run:
+
+```powershell
+$env:ADMIN_EMAIL = Read-Host "Administrator email"
+$securePassword = Read-Host "Administrator password" -AsSecureString
+$env:ADMIN_PASSWORD = [System.Net.NetworkCredential]::new("", $securePassword).Password
+npm --prefix services/api run create:admin
+Remove-Item Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD
+Remove-Variable securePassword
+```
+
+The API environment must already contain `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the target `DEFAULT_COLLEGE_ID`. Do not put the administrator password in a source file, commit it, or pass it as a command-line argument. The script can also link an existing Supabase Auth user to the application profile and set the developer-provided password.
+
 ---
 
 ## 🛠️ Workspaces & Available Scripts

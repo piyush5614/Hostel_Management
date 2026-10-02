@@ -4,9 +4,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Modal } from '../components/ui/modal';
-import { School, AlertCircle, Eye, EyeOff, Mail, Sparkles, Zap, Shield, Building2, Users, Star, KeyRound, UserPlus, CheckCircle2 } from 'lucide-react';
+import { School, AlertCircle, Eye, EyeOff, Mail, Sparkles, Zap, Shield, Building2, Users, KeyRound } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
-import { createAccount } from '../lib/supabase';
 import { toast } from 'sonner';
 import { ErrorBoundary, LoadingState } from '../components/error-boundary/error-boundary';
 
@@ -26,14 +25,6 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-
-  // Account creation state
-  const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false);
-  const [accountName, setAccountName] = useState('');
-  const [accountEmail, setAccountEmail] = useState('');
-  const [accountPassword, setAccountPassword] = useState('');
-  const [accountRole, setAccountRole] = useState<'student' | 'staff' | 'warden'>('student');
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   // Password reset state
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -151,68 +142,6 @@ export function LoginPage() {
     } finally {
       setIsResetting(false);
     }
-  };
-
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accountName.trim() || !validateEmail(accountEmail.trim())) {
-      toast.error('Enter your name and a valid email address');
-      return;
-    }
-    if (accountPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long');
-      return;
-    }
-
-    try {
-      setIsCreatingAccount(true);
-      await createAccount({
-        name: accountName.trim(),
-        email: accountEmail.trim(),
-        password: accountPassword,
-        role: accountRole,
-      });
-      setEmail(accountEmail.trim().toLowerCase());
-      setPassword(accountPassword);
-      setIsCreateAccountOpen(false);
-      setAccountName('');
-      setAccountEmail('');
-      setAccountPassword('');
-      toast.success('Account created. Signing you in now.');
-      await login(accountEmail.trim().toLowerCase(), accountPassword);
-    } catch (error: any) {
-      toast.error(error.message || 'Could not create your account');
-    } finally {
-      setIsCreatingAccount(false);
-    }
-  };
-
-  // Enhanced demo login shortcuts with new passwords
-  const handleDemoLogin = async (role: 'admin' | 'warden' | 'staff' | 'student') => {
-    const credentials: Record<string, { email: string; password: string }> = {
-      admin: { email: 'admin@tchostel.edu', password: 'admin123' },
-      warden: { email: 'warden@tchostel.edu', password: 'warden123' },
-      staff: { email: 'staff@tchostel.edu', password: 'staff123' },
-      student: { email: 'student@tchostel.edu', password: 'student123' },
-    };
-    
-    const { email: demoEmail, password: demoPassword } = credentials[role];
-    
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    
-    // Clear any existing errors
-    setEmailError('');
-    setPasswordError('');
-    clearError();
-
-    // Auto-submit after a brief delay for better UX
-    setTimeout(() => {
-      const form = document.querySelector('form') as HTMLFormElement;
-      if (form) {
-        form.requestSubmit();
-      }
-    }, 100);
   };
 
   // Handle Enter key press
@@ -369,115 +298,14 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8">
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                type="button"
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleDemoLogin('admin')}
-                disabled={isLoading}
-                className="group relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg btn-textured border-2 hover:border-primary-300"
-              >
-                <div className="flex items-center relative z-10">
-                  <Shield className="mr-2 h-4 w-4 text-primary-600 group-hover:text-primary-700 transition-colors" />
-                  <div className="text-left">
-                    <div className="text-xs font-bold">Admin</div>
-                    <div className="text-xs text-muted-foreground">admin123</div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </Button>
-              
-              <Button 
-                type="button"
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleDemoLogin('warden')}
-                disabled={isLoading}
-                className="group relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg btn-textured border-2 hover:border-secondary-300"
-              >
-                <div className="flex items-center relative z-10">
-                  <Building2 className="mr-2 h-4 w-4 text-secondary-600 group-hover:text-secondary-700 transition-colors" />
-                  <div className="text-left">
-                    <div className="text-xs font-bold">Warden</div>
-                    <div className="text-xs text-muted-foreground">warden123</div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-secondary-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </Button>
-              
-              <Button 
-                type="button"
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleDemoLogin('staff')}
-                disabled={isLoading}
-                className="group relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg btn-textured border-2 hover:border-success-300"
-              >
-                <div className="flex items-center relative z-10">
-                  <Users className="mr-2 h-4 w-4 text-success-600 group-hover:text-success-700 transition-colors" />
-                  <div className="text-left">
-                    <div className="text-xs font-bold">Staff</div>
-                    <div className="text-xs text-muted-foreground">staff123</div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-success-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </Button>
-              
-              <Button 
-                type="button"
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleDemoLogin('student')}
-                disabled={isLoading}
-                className="group relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg btn-textured border-2 hover:border-warning-300"
-              >
-                <div className="flex items-center relative z-10">
-                  <School className="mr-2 h-4 w-4 text-warning-600 group-hover:text-warning-700 transition-colors" />
-                  <div className="text-left">
-                    <div className="text-xs font-bold">Student</div>
-                    <div className="text-xs text-muted-foreground">student123</div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-warning-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </Button>
-            </div>
-            
-            <div className="mt-6 rounded-xl bg-gradient-to-r from-primary-50 via-white to-secondary-50 p-4 dark:from-primary-900/20 dark:via-card dark:to-secondary-900/20 border border-primary-200 dark:border-primary-800 shadow-lg">
-              <div className="text-center text-sm text-muted-foreground">
-                <div className="flex items-center justify-center mb-2">
-                  <Star className="h-4 w-4 mr-2 text-primary-600 animate-pulse" />
-                  <span className="font-bold text-primary-700 dark:text-primary-300">Enhanced Demo Mode</span>
-                  <Star className="h-4 w-4 ml-2 text-primary-600 animate-pulse" />
-                </div>
-                <p className="text-xs leading-relaxed">
-                  Click any demo account button for instant access.<br />
-                  <span className="font-mono bg-white/70 px-2 py-1 rounded-md dark:bg-black/30 text-primary-700 dark:text-primary-300">
-                    Demo credentials are active again
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Enhanced help section */}
           <div className="mt-8 text-center">
             <div className="mb-6 flex items-center gap-3 text-sm text-muted-foreground">
               <div className="h-px flex-1 bg-border" />
-              <span>New to TC Hostel Connect?</span>
+              <span>Account access</span>
               <div className="h-px flex-1 bg-border" />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsCreateAccountOpen(true)}
-              disabled={isLoading}
-              className="mb-6 h-11 w-full border-primary-200 bg-primary-50/60 font-semibold text-primary-700 transition-all hover:scale-[1.02] hover:border-primary-400 hover:bg-primary-100"
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Create a new account
-            </Button>
+            <p className="mb-6 text-sm text-muted-foreground">Sign in with the ID and password issued by your administrator.</p>
             <div className="rounded-xl bg-gradient-to-r from-muted/30 to-muted/50 p-4 border border-muted shadow-lg">
               <div className="flex items-center justify-center mb-2">
                 <Mail className="h-4 w-4 mr-2 text-primary-600" />
@@ -500,43 +328,7 @@ export function LoginPage() {
         </CardContent>
       </Card>
 
-      {/* Enhanced password reset modal */}
-      <Modal
-        isOpen={isCreateAccountOpen}
-        onClose={() => !isCreatingAccount && setIsCreateAccountOpen(false)}
-        title="Create your account"
-        size="sm"
-      >
-        <form onSubmit={handleCreateAccount} className="space-y-5">
-          <div className="rounded-xl border border-primary-200 bg-primary-50 p-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" />
-              <p className="text-sm leading-relaxed text-primary-800">
-                Use this account to sign in to the hostel portal. Your details are stored securely.
-              </p>
-            </div>
-          </div>
-          <Input label="Full name" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="e.g. Abhay Sahu" disabled={isCreatingAccount} required />
-          <Input label="Email address" type="email" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} placeholder="you@example.com" disabled={isCreatingAccount} required />
-          <Input label="Password" type="password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} placeholder="At least 8 characters" disabled={isCreatingAccount} minLength={8} required />
-          <div className="space-y-2">
-            <label htmlFor="account-role" className="text-sm font-medium">Account type</label>
-            <select id="account-role" value={accountRole} onChange={(e) => setAccountRole(e.target.value as typeof accountRole)} disabled={isCreatingAccount} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-              <option value="student">Student</option>
-              <option value="staff">Staff</option>
-              <option value="warden">Warden</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setIsCreateAccountOpen(false)} disabled={isCreatingAccount}>Cancel</Button>
-            <Button type="submit" isLoading={isCreatingAccount} disabled={isCreatingAccount} className="bg-gradient-to-r from-primary-600 to-primary-700">
-              <UserPlus className="mr-2 h-4 w-4" />
-              Create account
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
+      {/* Password reset modal */}
       <Modal
         isOpen={isResetModalOpen}
         onClose={() => {

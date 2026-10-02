@@ -20,6 +20,7 @@ export function StudentsPage() {
   const user = useAuthStore((state) => state.user);
   const refreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED, EVENTS.ROOM_UPDATED]);
   const canEdit = user?.role === 'admin' || user?.role === 'warden';
+  const canProvision = user?.role === 'admin';
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -150,7 +151,7 @@ export function StudentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Student Management</h1>
-        {canEdit && (
+        {canProvision && (
           <Button onClick={handleAddStudent}>
             <Plus className="mr-2 h-4 w-4" />
             Add New Student

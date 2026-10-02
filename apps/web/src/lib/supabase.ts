@@ -87,28 +87,6 @@ export const getRegisteredCredentials = () => credentialRegistry;
 
 /* ──────────────── Backend helpers ──────────────── */
 
-export async function createAccount(account: {
-  email: string;
-  password: string;
-  name: string;
-  role: 'student' | 'staff' | 'warden';
-}): Promise<void> {
-  const collegeId = getActiveCollegeId();
-  const response = await fetch('/api/auth/signup', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-college-id': collegeId,
-    },
-    body: JSON.stringify({ ...account, email: account.email.trim().toLowerCase(), collegeId }),
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || 'Account creation failed. Please try again.');
-  }
-}
-
 interface BackendLoginResult {
   user: {
     id: string;
@@ -235,6 +213,13 @@ export const supabase = {
 
       // ───── 1.  Try the real backend first ─────
       const backendResult = await backendLogin(identifier, password);
+      if (!backendResult) {
+        return {
+          data: { user: null, session: null },
+          error: { message: 'Invalid email or ID or password. Use the credentials issued by your administrator.' },
+        };
+      }
+
       if (backendResult) {
         console.log('✅ Backend login successful for:', backendResult.user.email);
 

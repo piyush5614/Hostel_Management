@@ -17,6 +17,7 @@ import { log } from './utils/logger.js';
 import { initSentry, sentryRequestHandler, sentryErrorHandler } from './utils/sentry.js';
 import { initializeSocket } from './socket.js';
 import authRoutes from './routes/auth.js';
+import adminProvisioningRoutes from './routes/admin-provisioning.js';
 import studentRoutes from './routes/students.js';
 import roomRoutes from './routes/rooms.js';
 import emailRoutes from './routes/email.js';
@@ -68,6 +69,7 @@ if (process.env.NODE_ENV === 'production') {
   app.use('/api/auth/login', loginLimiter);
 }
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminProvisioningRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/email', emailRoutes);

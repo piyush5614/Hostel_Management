@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -12,16 +12,19 @@ import {
   Briefcase, Building2, AlertCircle,
   Activity, BadgeCheck, Download, FileSpreadsheet, FileText,
 } from 'lucide-react';
-import { mockStaff, deleteStaffMember, getTasksByStaff } from '../store/mock-data';
+import { mockStaff, deleteStaffMember, getTasksByStaff, syncStaffFromApi } from '../store/mock-data';
 import { exportService } from '../services/export';
 import { Staff } from '../types';
 import { cn, formatDate } from '../lib/utils';
 import { toast } from 'sonner';
 import { useAuthStore } from '../store/auth-store';
+import { useDataRefresh } from '../utils/use-data-refresh';
+import { EVENTS } from '../utils/event-bus';
 
 export function StaffPage() {
   const { t } = useTranslation();
   const user = useAuthStore(s => s.user);
+  const staffRefreshKey = useDataRefresh([EVENTS.STAFF_UPDATED]);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -35,6 +38,10 @@ export function StaffPage() {
     status: '',
   });
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  useEffect(() => {
+    if (user?.id) void syncStaffFromApi();
+  }, [user?.id]);
 
   const filteredStaff = useMemo(() => {
     let result = [...mockStaff];
@@ -68,12 +75,12 @@ export function StaffPage() {
       );
     }
     return result;
-  }, [searchQuery, filter]);
+  }, [searchQuery, filter, staffRefreshKey]);
 
   const departments = useMemo(() => {
     const deps = [...new Set(mockStaff.map(s => s.department))];
     return deps.sort();
-  }, []);
+  }, [staffRefreshKey]);
 
   const handleDeleteStaff = (staff: Staff) => {
     if (window.confirm(`Are you sure you want to deactivate ${staff.name}?`)) {
@@ -121,6 +128,7 @@ export function StaffPage() {
   };
 
   const canManage = user?.role === 'admin' || user?.role === 'warden';
+  const canProvision = user?.role === 'admin';
 
   const handleExport = (format: 'excel' | 'pdf' | 'csv') => {
     const data = filteredStaff.map(s => {
@@ -178,10 +186,12 @@ export function StaffPage() {
                 </div>
               )}
             </div>
-            <Button onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Staff
-            </Button>
+            {canProvision && (
+              <Button onClick={() => setIsAddModalOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Staff
+              </Button>
+            )}
           </div>
         )}
       </div>

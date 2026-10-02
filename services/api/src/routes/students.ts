@@ -119,6 +119,10 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
   }
 });
 
+router.post('/', (_req: Request, res: Response): void => {
+  res.status(410).json({ error: 'Student accounts must be provisioned by an administrator.' });
+});
+
 router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();

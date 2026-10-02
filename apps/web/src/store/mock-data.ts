@@ -563,68 +563,44 @@ export const syncStudentsFromApi = async (): Promise<Student[]> => {
   return mockStudents;
 };
 
-export const addStudent = (student: Omit<Student, 'id'>): Student => {
-  const credential = generateCredentials(student.name, student.email, 'student');
-  const newStudent: Student = {
-    ...student,
-    id: Date.now().toString(),
-    userId: credential.userId,
-    enrollmentNumber: student.enrollmentNumber || credential.generatedId,
-    isActive: true,
-    currentStatus: 'present',
-    generatedPassword: credential.generatedPassword,
-  };
-  mockStudents.push(newStudent);
-  addActivityLog('system', 'System', 'created', 'student', newStudent.id, `Student ${newStudent.name} added`);
-  saveToStorage();
-  eventBus.emit(EVENTS.STUDENT_UPDATED);
+const mapStaffFromApi = (row: any): Staff => ({
+  id: row.id,
+  userId: row.user_id ?? row.users?.id,
+  name: row.users?.name ?? row.name ?? '',
+  email: row.users?.email ?? row.email ?? '',
+  employeeId: row.employee_id ?? row.users?.generated_id ?? '',
+  position: row.position ?? '',
+  contactNumber: row.contact_number ?? '',
+  address: row.address ?? '',
+  joiningDate: row.joining_date ?? new Date().toISOString(),
+  profileImage: row.profile_image ?? row.users?.profile_image ?? undefined,
+  isActive: Boolean(row.is_active ?? row.users?.is_active ?? true),
+  shiftTiming: row.shift_timing ?? '08:00-16:00',
+  department: row.department ?? '',
+  gender: row.gender ?? undefined,
+  dateOfBirth: row.date_of_birth ?? undefined,
+  medicalNotes: row.medical_notes ?? undefined,
+  emergencyContact: row.emergency_contact ?? undefined,
+  qualifications: row.qualifications ?? undefined,
+});
 
-  void apiRequest<any>('/students', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: student.name,
-      email: student.email,
-      password: credential.generatedPassword,
-      generatedId: credential.generatedId,
-      enrollmentNumber: newStudent.enrollmentNumber,
-      course: student.course,
-      year: student.year,
-      gender: student.gender,
-      dateOfBirth: student.dateOfBirth,
-      contactNumber: student.contactNumber,
-      address: student.address,
-      guardianName: student.guardianName,
-      guardianContact: student.guardianContact,
-      emergencyContact: student.emergencyContact,
-      medicalNotes: student.medicalNotes,
-      joiningDate: student.joiningDate,
-      profileImage: student.profileImage,
-      parentImage1: student.parentImage1,
-      parentImage2: student.parentImage2,
-      currentStatus: newStudent.currentStatus,
-      isActive: true,
-    }),
-  })
-    .then((row) => {
-      const created = upsertStudentFromApi(row);
-      credential.userId = created.userId;
-      registerCredentialForLogin({
-        email: credential.email,
-        generatedId: credential.generatedId,
-        generatedPassword: credential.generatedPassword,
-        name: credential.name,
-        role: credential.role,
-        userId: created.userId,
-        isActive: credential.isActive,
-      });
+export const syncStaffFromApi = async (): Promise<Staff[]> => {
+  if (!getApiToken()) {
+    return mockStaff;
+  }
+
+  try {
+    const rows = await apiRequest<any[]>('/staff', { method: 'GET' });
+    if (Array.isArray(rows)) {
+      mockStaff.splice(0, mockStaff.length, ...rows.map(mapStaffFromApi));
       saveToStorage();
-      eventBus.emit(EVENTS.STUDENT_UPDATED);
-    })
-    .catch((error) => {
-      console.warn('Failed to persist student to API, kept local copy:', error);
-    });
+      eventBus.emit(EVENTS.STAFF_UPDATED);
+    }
+  } catch (error) {
+    console.warn('Failed to sync staff from API, using local cache:', error);
+  }
 
-  return newStudent;
+  return mockStaff;
 };
 
 export const updateStudent = (id: string, updates: Partial<Student>) => {
@@ -1513,35 +1489,6 @@ export const resetCredentialPassword = (credentialId: string): string | null => 
 // ============================================================
 // Staff CRUD Operations
 // ============================================================
-export const addStaff = (staff: Omit<Staff, 'id'>): Staff => {
-  const credential = generateCredentials(staff.name, staff.email, 'staff');
-  const newStaff: Staff = {
-    ...staff,
-    id: Date.now().toString(),
-    employeeId: staff.employeeId || credential.generatedId,
-    isActive: true,
-    generatedPassword: credential.generatedPassword,
-  };
-
-  // Re-register so the auth fallback profile includes latest staff details and image.
-  registerCredentialForLogin({
-    email: newStaff.email,
-    generatedId: newStaff.employeeId,
-    generatedPassword: credential.generatedPassword,
-    name: newStaff.name,
-    role: 'staff',
-    userId: newStaff.userId,
-    isActive: newStaff.isActive,
-    profileImage: newStaff.profileImage,
-  });
-
-  mockStaff.push(newStaff);
-  addActivityLog('system', 'System', 'created', 'staff', newStaff.id, `Staff member ${newStaff.name} added`);
-  saveToStorage();
-  eventBus.emit(EVENTS.STAFF_UPDATED);
-  return newStaff;
-};
-
 export const updateStaffMember = (id: string, updates: Partial<Staff>): Staff | null => {
   const idx = mockStaff.findIndex(s => s.id === id);
   if (idx !== -1) {

@@ -3,7 +3,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Student } from '../../types';
-import { addStudent, updateStudent } from '../../store/mock-data';
+import { syncStudentsFromApi, updateStudent } from '../../store/mock-data';
+import { provisionStudentAccount } from '../../lib/admin-provisioning';
 import { toast } from 'sonner';
 import { Key, Copy, Check, Camera, Upload, X, UserCircle } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accountPassword, setAccountPassword] = useState('');
   const [generatedCreds, setGeneratedCreds] = useState<{ id: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState('');
   const studentImgRef = useRef<HTMLInputElement>(null);
@@ -73,16 +75,40 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         toast.success('Student updated successfully!');
         onSuccess();
       } else {
-        // Add new student — generates credentials automatically
-        const newStudent = addStudent(studentData);
-        setGeneratedCreds({
-          id: newStudent.enrollmentNumber,
-          password: newStudent.generatedPassword || 'N/A',
+        const created = await provisionStudentAccount({
+          email: formData.email.trim().toLowerCase(),
+          password: accountPassword,
+          name: formData.name.trim(),
+          generatedId: formData.enrollmentNumber.trim(),
+          profile: {
+            enrollment_number: formData.enrollmentNumber.trim(),
+            course: formData.course.trim(),
+            year: parseInt(formData.year, 10),
+            gender: formData.gender,
+            date_of_birth: formData.dateOfBirth,
+            contact_number: formData.contactNumber,
+            address: formData.address,
+            guardian_name: formData.guardianName,
+            guardian_contact: formData.guardianContact,
+            emergency_contact: formData.emergencyContact,
+            medical_notes: formData.medicalNotes || null,
+            joining_date: formData.joiningDate,
+            profile_image: formData.profileImage || null,
+            parent_image_1: formData.parentImage1 || null,
+            parent_image_2: formData.parentImage2 || null,
+          },
         });
-        toast.success('Student added with auto-generated credentials!');
+        const oneTimePassword = accountPassword;
+        setAccountPassword('');
+        void syncStudentsFromApi();
+        setGeneratedCreds({
+          id: created.id,
+          password: oneTimePassword,
+        });
+        toast.success('Student account provisioned. Share the credentials once.');
       }
     } catch (error) {
-      toast.error('Failed to save student. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to create student account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,8 +134,8 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
               <Key className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-green-800 dark:text-green-200">Student Credentials Generated!</h3>
-              <p className="text-sm text-green-600 dark:text-green-400">Save these credentials — the password cannot be recovered later.</p>
+              <h3 className="text-lg font-bold text-green-800 dark:text-green-200">Student Account Created</h3>
+              <p className="text-sm text-green-600 dark:text-green-400">Share this password with the student now. It will not be shown again.</p>
             </div>
           </div>
 
@@ -254,6 +280,19 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
           required
         />
       </div>
+
+      {!student && (
+        <Input
+          label="Login Password"
+          type="password"
+          value={accountPassword}
+          onChange={(e) => setAccountPassword(e.target.value)}
+          placeholder="At least 8 characters"
+          minLength={8}
+          autoComplete="new-password"
+          required
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Select

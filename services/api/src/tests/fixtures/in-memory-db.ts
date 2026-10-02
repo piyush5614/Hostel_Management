@@ -1,5 +1,3 @@
-import bcrypt from 'bcryptjs';
-
 type Row = Record<string, any>;
 
 class QueryBuilder implements PromiseLike<{ data: Row[] | Row | null; error: any }> {
@@ -61,8 +59,8 @@ export async function resetTestDb(): Promise<void> {
   students.length = 0;
   leaveRequests.length = 0;
   users.push(
-    { id: 'student-user', email: 'student@test.local', password: await bcrypt.hash('TestPassword123!', 10), name: 'Test Student', role: 'student', college_id: 'college-default', is_active: true, generated_id: null },
-    { id: 'warden-user', email: 'warden@test.local', password: await bcrypt.hash('WardenPass123!', 10), name: 'Test Warden', role: 'warden', college_id: 'college-default', is_active: true, generated_id: null }
+    { id: 'student-user', auth_id: 'student-auth', email: 'student@test.local', password: null, name: 'Test Student', role: 'student', college_id: 'college-default', is_active: true, generated_id: 'STU-0001' },
+    { id: 'warden-user', auth_id: 'warden-auth', email: 'warden@test.local', password: null, name: 'Test Warden', role: 'warden', college_id: 'college-default', is_active: true, generated_id: 'STAFF-0001' }
   );
   students.push({ id: 'student-record', user_id: 'student-user', college_id: 'college-default' });
 }

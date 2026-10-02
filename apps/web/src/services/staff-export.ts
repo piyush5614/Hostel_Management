@@ -1,5 +1,5 @@
 import { Staff, StaffTask } from '../types';
-import { mockStaff, mockStaffTasks, addStaff } from '../store/mock-data';
+import { mockStaff, mockStaffTasks } from '../store/mock-data';
 import { formatDate } from '../lib/utils';
 
 // ============================================================
@@ -84,87 +84,11 @@ export function parseStaffCSV(csvContent: string): ImportResult {
   if (lines.length < 2) {
     return { success: 0, failed: 0, errors: ['CSV file is empty or has only headers'] };
   }
-
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  const result: ImportResult = { success: 0, failed: 0, errors: [] };
-
-  // Expected columns
-  const nameIdx = headers.findIndex(h => h.includes('name'));
-  const emailIdx = headers.findIndex(h => h.includes('email'));
-  const positionIdx = headers.findIndex(h => h.includes('position'));
-  const departmentIdx = headers.findIndex(h => h.includes('department'));
-  const contactIdx = headers.findIndex(h => h.includes('contact'));
-  const shiftIdx = headers.findIndex(h => h.includes('shift'));
-  const addressIdx = headers.findIndex(h => h.includes('address'));
-
-  if (nameIdx === -1 || emailIdx === -1) {
-    return { success: 0, failed: 0, errors: ['CSV must have at least "name" and "email" columns'] };
-  }
-
-  for (let i = 1; i < lines.length; i++) {
-    try {
-      // Handle quoted commas
-      const values = parseCSVLine(lines[i]);
-      
-      const name = values[nameIdx]?.trim();
-      const email = values[emailIdx]?.trim();
-      
-      if (!name || !email) {
-        result.failed++;
-        result.errors.push(`Row ${i + 1}: Missing name or email`);
-        continue;
-      }
-
-      // Check for duplicate email
-      if (mockStaff.find(s => s.email === email)) {
-        result.failed++;
-        result.errors.push(`Row ${i + 1}: Email "${email}" already exists`);
-        continue;
-      }
-
-      addStaff({
-        userId: `import-${Date.now()}-${i}`,
-        name,
-        email,
-        employeeId: '',
-        position: positionIdx >= 0 ? values[positionIdx]?.trim() || 'Staff' : 'Staff',
-        department: departmentIdx >= 0 ? values[departmentIdx]?.trim() || 'General' : 'General',
-        contactNumber: contactIdx >= 0 ? values[contactIdx]?.trim() || '' : '',
-        shiftTiming: shiftIdx >= 0 ? values[shiftIdx]?.trim() || '08:00-16:00' : '08:00-16:00',
-        address: addressIdx >= 0 ? values[addressIdx]?.trim() || '' : '',
-        joiningDate: new Date().toISOString().split('T')[0],
-        isActive: true,
-        onDuty: false,
-      });
-
-      result.success++;
-    } catch (err) {
-      result.failed++;
-      result.errors.push(`Row ${i + 1}: Parse error`);
-    }
-  }
-
-  return result;
-}
-
-function parseCSVLine(line: string): string[] {
-  const values: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      values.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  values.push(current);
-  return values;
+  return {
+    success: 0,
+    failed: lines.length - 1,
+    errors: ['CSV account import is disabled. Create each account through the Admin form so credentials are provisioned securely.'],
+  };
 }
 
 // ============================================================

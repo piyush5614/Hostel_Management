@@ -3,7 +3,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Staff } from '../../types';
-import { addStaff, updateStaffMember } from '../../store/mock-data';
+import { syncStaffFromApi, updateStaffMember } from '../../store/mock-data';
+import { provisionStaffAccount } from '../../lib/admin-provisioning';
 import { toast } from 'sonner';
 import { Copy, Check, Key, Upload, X, Camera } from 'lucide-react';
 
@@ -33,6 +34,7 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accountPassword, setAccountPassword] = useState('');
   const [generatedCreds, setGeneratedCreds] = useState<{ id: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string>('');
   const staffImgRef = useRef<HTMLInputElement>(null);
@@ -61,21 +63,37 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
         toast.success('Staff member updated successfully!');
         onSuccess();
       } else {
-        const newStaff = addStaff({
-          ...formData,
-          userId: `staff-${Date.now()}`,
-          gender: formData.gender as 'male' | 'female' | 'other',
-          isActive: true,
-          onDuty: false,
+        const created = await provisionStaffAccount({
+          email: formData.email.trim().toLowerCase(),
+          password: accountPassword,
+          name: formData.name.trim(),
+          generatedId: formData.employeeId.trim(),
+          profile: {
+            position: formData.position,
+            department: formData.department,
+            contact_number: formData.contactNumber,
+            address: formData.address,
+            joining_date: formData.joiningDate,
+            shift_timing: formData.shiftTiming,
+            gender: formData.gender,
+            date_of_birth: formData.dateOfBirth || null,
+            emergency_contact: formData.emergencyContact || null,
+            qualifications: formData.qualifications || null,
+            medical_notes: formData.medicalNotes || null,
+            profile_image: formData.profileImage || null,
+          },
         });
+        const oneTimePassword = accountPassword;
+        setAccountPassword('');
+        void syncStaffFromApi();
         setGeneratedCreds({
-          id: newStaff.employeeId,
-          password: newStaff.generatedPassword || 'N/A',
+          id: created.id,
+          password: oneTimePassword,
         });
-        toast.success('Staff member added with auto-generated credentials!');
+        toast.success('Staff account provisioned. Share the credentials once.');
       }
     } catch (error) {
-      toast.error('Failed to save staff member. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to create staff account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -100,8 +118,8 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
               <Key className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-green-800 dark:text-green-200">Credentials Generated!</h3>
-              <p className="text-sm text-green-600 dark:text-green-400">Save these credentials - the password cannot be recovered later.</p>
+              <h3 className="text-lg font-bold text-green-800 dark:text-green-200">Staff Account Created</h3>
+              <p className="text-sm text-green-600 dark:text-green-400">Share this password with the staff member now. It will not be shown again.</p>
             </div>
           </div>
           
@@ -161,6 +179,19 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
         />
       </div>
 
+      {!staff && (
+        <Input
+          label="Login Password"
+          type="password"
+          value={accountPassword}
+          onChange={(e) => setAccountPassword(e.target.value)}
+          placeholder="At least 8 characters"
+          minLength={8}
+          autoComplete="new-password"
+          required
+        />
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <Select
           label="Position"
@@ -192,6 +223,16 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
           onChange={(e) => handleChange('department', e.target.value)}
         />
       </div>
+
+      {!staff && (
+        <Input
+          label="Employee Login ID"
+          value={formData.employeeId}
+          onChange={(e) => handleChange('employeeId', e.target.value)}
+          placeholder="STAFF-0001"
+          required
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Select
