@@ -7,6 +7,21 @@ import { log } from '../utils/logger.js';
 const router = Router();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+async function findAuthUserByEmail(db: Awaited<ReturnType<typeof getDb>>, email: string): Promise<boolean> {
+  for (let page = 1; page <= 100; page += 1) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    if (data.users.some((user) => user.email?.toLowerCase() === email)) {
+      return true;
+    }
+    if (data.users.length < 1000) {
+      return false;
+    }
+  }
+
+  throw new Error('Could not search all Supabase Auth users safely.');
+}
+
 async function rollbackProvisioning(db: Awaited<ReturnType<typeof getDb>>, authUserId: string): Promise<void> {
   const { error: profileRollbackError } = await db.rpc('rollback_managed_user', { p_auth_id: authUserId });
   if (profileRollbackError) {
@@ -40,7 +55,7 @@ async function provisionAccount(req: Request, res: Response, role: AccountRole):
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const generatedId = typeof body.generatedId === 'string' ? body.generatedId.trim() : '';
+  const generatedId = typeof body.generatedId === 'string' ? body.generatedId.trim().toUpperCase() : '';
   const profile = body.profile && typeof body.profile === 'object' && !Array.isArray(body.profile)
     ? body.profile as Record<string, unknown>
     : {};
@@ -86,7 +101,7 @@ async function provisionAccount(req: Request, res: Response, role: AccountRole):
     .from('users')
     .select('id')
     .eq('college_id', collegeId)
-    .eq('generated_id', generatedId)
+    .ilike('generated_id', generatedId)
     .maybeSingle();
   if (idCheckError) throw idCheckError;
   if (existingId) {
@@ -94,9 +109,7 @@ async function provisionAccount(req: Request, res: Response, role: AccountRole):
     return;
   }
 
-  const { data: authUsers, error: authListError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (authListError) throw authListError;
-  if (authUsers.users.some((user) => user.email?.toLowerCase() === email)) {
+  if (await findAuthUserByEmail(db, email)) {
     res.status(409).json({ error: 'An Auth account with this email already exists.' });
     return;
   }

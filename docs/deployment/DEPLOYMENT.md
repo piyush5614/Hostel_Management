@@ -346,7 +346,7 @@ Features:
 
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
-| POST | `/api/auth/signup` | Create new account | None |
+| POST | `/api/auth/signup` | Disabled; returns `410` | None |
 | POST | `/api/auth/login` | Login and get JWT | None |
 | GET | `/api/auth/me` | Get current user | Required |
 | GET | `/api/students` | List students | Required |

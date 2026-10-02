@@ -90,6 +90,19 @@ Remove-Variable securePassword
 
 The API environment must already contain `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the target `DEFAULT_COLLEGE_ID`. Do not put the administrator password in a source file, commit it, or pass it as a command-line argument. The script can also link an existing Supabase Auth user to the application profile and set the developer-provided password.
 
+Only an authenticated administrator can provision accounts. The API endpoints are:
+
+```text
+POST /api/admin/students
+POST /api/admin/staff
+Authorization: Bearer <administrator JWT>
+Content-Type: application/json
+```
+
+Both endpoints accept `email`, `password`, `name`, `generatedId`, and a `profile` object. Student profiles require `course`, `year`, `gender`, `date_of_birth`, `contact_number`, `address`, `guardian_name`, `guardian_contact`, and `emergency_contact`. Staff profiles require `position`, `department`, `contact_number`, and `address`. Passwords must be at least eight characters. A successful response is `201` and contains `userId`, `id`, `email`, `role`, `college_id`, and `profile`; it never contains the password. Duplicate IDs return `409`, invalid profile data returns `400`, and non-admin callers receive `403`.
+
+The administrator UI displays the password entered for a newly provisioned account once so it can be shared with the student or staff member. It is cleared from the form state after provisioning and is not returned by the API or persisted by the application.
+
 ---
 
 ## 🛠️ Workspaces & Available Scripts

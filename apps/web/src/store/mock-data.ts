@@ -7,7 +7,6 @@ import {
   DashboardStats, Activity, AutoAssignCriteria,
   GeneratedCredential, ActivityLog, TaskComment, TaskProgress
 } from '../types';
-import { registerCredentialForLogin } from '../lib/supabase';
 import { exportService } from '../services/export';
 import { eventBus, EVENTS } from '../utils/event-bus';
 import { 
@@ -1352,63 +1351,6 @@ export const submitAttendanceToAdmin = (sheetId: string) => {
 export const mockCredentials: GeneratedCredential[] = persisted?.credentials ?? [];
 export const mockActivityLogs: ActivityLog[] = persisted?.activityLogs ?? [];
 
-// Re-register persisted credentials with the login system on startup
-if (persisted?.credentials) {
-  persisted.credentials.forEach(c => {
-    if (c.isActive) {
-      registerCredentialForLogin({
-        email: c.email,
-        generatedId: c.generatedId,
-        generatedPassword: c.generatedPassword,
-        name: c.name,
-        role: c.role as string,
-        userId: c.userId,
-        isActive: c.isActive,
-      });
-    }
-  });
-}
-
-// ============================================================
-// Auto-register ALL existing students & staff so they can login
-// even on a fresh browser with no localStorage data.
-// Students: login with email / password "student123"
-// Staff:    login with email / password "staff123"
-// ============================================================
-(() => {
-  // Register every student that has no explicit credential yet
-  mockStudents.forEach(s => {
-    // Use the student's own generatedPassword if available, otherwise default
-    const pw = s.generatedPassword || 'student123';
-    registerCredentialForLogin({
-      email: s.email,
-      generatedId: s.enrollmentNumber,   // e.g. TC2024001
-      generatedPassword: pw,
-      name: s.name,
-      role: 'student',
-      userId: s.userId,
-      isActive: s.isActive,
-    });
-  });
-
-  // Register every staff member
-  mockStaff.forEach(st => {
-    const pw = st.generatedPassword || 'staff123';
-    registerCredentialForLogin({
-      email: st.email,
-      generatedId: st.employeeId,         // e.g. TC-STAFF-001
-      generatedPassword: pw,
-      name: st.name,
-      role: 'staff',
-      userId: st.userId,
-      isActive: st.isActive,
-      profileImage: st.profileImage,
-    });
-  });
-
-  console.log(`✅ Auto-registered ${mockStudents.length} students & ${mockStaff.length} staff for login`);
-})();
-
 const generateStaffId = (): string => {
   const num = mockStaff.length + mockCredentials.filter(c => c.role === 'staff').length + 1;
   return `STAFF-${num.toString().padStart(4, '0')}`;
@@ -1449,17 +1391,6 @@ export const generateCredentials = (
   mockCredentials.push(credential);
   saveToStorage();
 
-  // Register with the login system so this credential can be used to sign in
-  registerCredentialForLogin({
-    email: credential.email,
-    generatedId: credential.generatedId,
-    generatedPassword: credential.generatedPassword,
-    name: credential.name,
-    role: credential.role,
-    userId: credential.userId,
-    isActive: credential.isActive,
-  });
-
   return credential;
 };
 
@@ -1470,16 +1401,6 @@ export const resetCredentialPassword = (credentialId: string): string | null => 
     mockCredentials[idx].generatedPassword = newPassword;
     mockCredentials[idx].passwordResetAt = new Date().toISOString();
 
-    // Also update the login registry
-    registerCredentialForLogin({
-      email: mockCredentials[idx].email,
-      generatedId: mockCredentials[idx].generatedId,
-      generatedPassword: newPassword,
-      name: mockCredentials[idx].name,
-      role: mockCredentials[idx].role as string,
-      userId: mockCredentials[idx].userId,
-      isActive: mockCredentials[idx].isActive,
-    });
     saveToStorage();
     return newPassword;
   }
@@ -1494,17 +1415,6 @@ export const updateStaffMember = (id: string, updates: Partial<Staff>): Staff | 
   if (idx !== -1) {
     const existing = mockStaff[idx];
     mockStaff[idx] = { ...existing, ...updates };
-
-    registerCredentialForLogin({
-      email: mockStaff[idx].email,
-      generatedId: mockStaff[idx].employeeId,
-      generatedPassword: mockStaff[idx].generatedPassword || existing.generatedPassword || 'staff123',
-      name: mockStaff[idx].name,
-      role: 'staff',
-      userId: mockStaff[idx].userId,
-      isActive: mockStaff[idx].isActive,
-      profileImage: mockStaff[idx].profileImage,
-    });
 
     addActivityLog('system', 'System', 'updated', 'staff', id, `Staff member ${mockStaff[idx].name} updated`);
     saveToStorage();

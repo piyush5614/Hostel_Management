@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/auth-store';
-import { mockStaff, mockCredentials } from '../store/mock-data';
 
 /**
  * TaskStartPage — Public route: /task-start?token=xxx
@@ -12,17 +11,10 @@ import { mockStaff, mockCredentials } from '../store/mock-data';
  * auto-logs them in, and redirects to /staff-tasks.
  */
 
-// Built-in demo staff mapping: staff userId → { loginEmail, password }
-// These are the hardcoded demo accounts from supabase.ts MOCK_USERS
-const DEMO_STAFF_LOGINS: Record<string, { email: string; password: string }> = {
-  'staff-1':   { email: 'staff@tchostel.edu',   password: 'staff123' },
-  'warden-1':  { email: 'warden@tchostel.edu',  password: 'warden123' },
-};
-
 export function TaskStartPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const [status, setStatus] = useState<'loading' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -35,12 +27,11 @@ export function TaskStartPage() {
     }
 
     // Decode the token (base64 → "staffId|staffEmail")
-    let staffId: string;
     let staffEmail: string;
     try {
       const decoded = atob(token).trim();
       const parts = decoded.split('|');
-      staffId = parts[0];
+      if (!parts[0]) throw new Error('Missing staff identifier');
       staffEmail = parts[1] || '';
     } catch {
       setStatus('error');
@@ -48,73 +39,14 @@ export function TaskStartPage() {
       return;
     }
 
-    // If already authenticated as this staff, redirect directly
-    const currentUser = useAuthStore.getState().user;
-    if (isAuthenticated && currentUser) {
-      // Check if the logged-in user matches the staff from the email
-      const staff = mockStaff.find(s => s.id === staffId);
-      if (staff && (
-        currentUser.id === staff.id ||
-        currentUser.id === staff.userId ||
-        currentUser.email?.toLowerCase() === staff.email?.toLowerCase() ||
-        currentUser.email?.toLowerCase() === staffEmail.toLowerCase()
-      )) {
-        navigate('/staff-tasks', { replace: true });
-        return;
-      }
-      // Logged in as a different user — log out first, then re-login
-      logout().then(() => autoLogin(staffId, staffEmail));
-      return;
+    if (isAuthenticated && useAuthStore.getState().user?.email?.toLowerCase() === staffEmail.toLowerCase()) {
+    navigate('/staff-tasks', { replace: true });
+    return;
     }
 
-    autoLogin(staffId, staffEmail);
+    setStatus('error');
+    setErrorMsg('Please sign in with the staff credentials issued by your administrator.');
   }, []);
-
-  const autoLogin = async (staffId: string, staffEmail: string) => {
-    try {
-      // Find the staff record 
-      const staff = mockStaff.find(s => s.id === staffId) 
-                 || mockStaff.find(s => s.email?.toLowerCase() === staffEmail.toLowerCase());
-
-      if (!staff) {
-        setStatus('error');
-        setErrorMsg('Staff account not found. Please log in manually.');
-        return;
-      }
-
-      // 1. Try built-in demo accounts (matched by staff.userId)
-      const demoLogin = DEMO_STAFF_LOGINS[staff.userId];
-      if (demoLogin) {
-        await login(demoLogin.email, demoLogin.password);
-        navigate('/staff-tasks', { replace: true });
-        return;
-      }
-
-      // 2. Look up dynamically generated credentials by staff email or userId
-      const credential = mockCredentials.find(
-        (c) => c.isActive && (
-          c.email?.toLowerCase() === staff.email?.toLowerCase() ||
-          c.userId === staff.userId
-        )
-      );
-
-      if (credential) {
-        await login(credential.email || credential.generatedId, credential.generatedPassword);
-        navigate('/staff-tasks', { replace: true });
-        return;
-      }
-
-      // 3. No credentials found — redirect to login
-      setStatus('error');
-      setErrorMsg(
-        'Could not find login credentials for your account. Please log in manually.'
-      );
-    } catch (err: any) {
-      console.error('Auto-login failed:', err);
-      setStatus('error');
-      setErrorMsg('Auto-login failed. Please log in manually.');
-    }
-  };
 
   if (status === 'error') {
     return (

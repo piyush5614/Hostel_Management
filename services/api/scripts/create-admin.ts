@@ -59,6 +59,34 @@ async function main() {
     createdAuthUser = true;
   }
 
+  const { data: existingProfiles, error: profileLookupError } = await supabase
+    .from('users')
+    .select('id, auth_id')
+    .eq('college_id', collegeId)
+    .ilike('email', email!)
+    .limit(1);
+
+  if (profileLookupError) throw profileLookupError;
+
+  const existingProfile = existingProfiles?.[0];
+  if (existingProfile && existingProfile.auth_id && existingProfile.auth_id !== authUserId) {
+    const { error: repairError } = await supabase
+      .from('users')
+      .update({
+        auth_id: authUserId,
+        name: 'Administrator',
+        email: email!,
+        role: 'admin',
+        is_active: true,
+        password: null,
+      })
+      .eq('id', existingProfile.id);
+
+    if (repairError) throw repairError;
+    console.log(`Admin account repaired for ${collegeId}: ${email}`);
+    return;
+  }
+
   const { error: profileError } = await supabase.rpc('provision_managed_user', {
     p_auth_id: authUserId,
     p_college_id: collegeId,
@@ -83,7 +111,11 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : 'Unknown provisioning error';
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : JSON.stringify(error);
   console.error(`Admin provisioning failed: ${message}`);
   process.exitCode = 1;
 });

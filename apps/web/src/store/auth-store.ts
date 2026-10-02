@@ -4,13 +4,34 @@ import {
   supabase, 
   getCurrentUser, 
   getUserProfile, 
-  createUserProfile, 
   updateLastLogin,
   signOut as supabaseSignOut
 } from '../lib/supabase';
 import { User, UserRole } from '../types';
 
 let initializationInFlight = false;
+
+function toAppUser(profile: {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  college_id?: string;
+  profile_image?: string;
+  is_active?: boolean;
+  last_login?: string;
+}): User {
+  return {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    role: profile.role as UserRole,
+    collegeId: profile.college_id,
+    profileImage: profile.profile_image,
+    isActive: profile.is_active ?? true,
+    lastLogin: profile.last_login,
+  };
+}
 
 interface AuthState {
   user: User | null;
@@ -95,26 +116,30 @@ export const useAuthStore = create<AuthState>()(
 
           console.log('✅ Authentication successful for:', authData.user.email);
 
-          // Get user profile (mock implementation)
+          // The backend profile is authoritative; never invent a student role.
           let userProfile;
           try {
             console.log('🔎 Auth diagnostic: login loading profile', { authId: authData.user.id });
             userProfile = await getUserProfile(authData.user.id);
             console.log('🔎 Auth diagnostic: login profile resolved', userProfile);
           } catch (profileError: any) {
-            console.log('📝 User profile not found, creating new profile...');
-            
-            try {
-              userProfile = await createUserProfile(authData.user, {
-                role: authData.user.user_metadata?.role || 'student'
+            console.error('❌ Failed to load provisioned user profile:', profileError);
+            const sessionProfile = authData.session?.profile;
+            if (sessionProfile?.id === authData.user.id && sessionProfile.role) {
+              const user = toAppUser(sessionProfile);
+              set({
+                user,
+                isAuthenticated: true,
+                isLoading: false,
+                error: null,
               });
-              console.log('✅ User profile created successfully');
-            } catch (createError: any) {
-              console.error('❌ Failed to create user profile:', createError);
-              const errorMessage = 'Failed to create user profile. Please contact support.';
-              set({ error: errorMessage, isLoading: false });
-              throw new Error(errorMessage);
+              return user;
             }
+            const errorMessage = profileError instanceof Error
+              ? profileError.message
+              : 'Failed to load the provisioned user profile. Please contact your administrator.';
+            set({ error: errorMessage, isLoading: false });
+            throw new Error(errorMessage);
           }
 
           // Update last login (mock)
@@ -125,16 +150,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // Create user object
-          const user: User = {
-            id: userProfile.id,
-            name: userProfile.name,
-            email: userProfile.email,
-            role: userProfile.role as UserRole,
-            collegeId: userProfile.college_id,
-            profileImage: userProfile.profile_image,
-            isActive: userProfile.is_active ?? true,
-            lastLogin: userProfile.last_login,
-          };
+          const user = toAppUser(userProfile);
 
           console.log('✅ Login successful for user:', user.name, 'Role:', user.role);
           
@@ -223,16 +239,7 @@ export const useAuthStore = create<AuthState>()(
               const userProfile = await getUserProfile(session.user.id);
               console.log('🔎 Auth diagnostic: initialize profile resolved', userProfile);
               
-              const user: User = {
-                id: userProfile.id,
-                name: userProfile.name,
-                email: userProfile.email,
-                role: userProfile.role as UserRole,
-                collegeId: userProfile.college_id,
-                profileImage: userProfile.profile_image,
-                isActive: userProfile.is_active ?? true,
-                lastLogin: userProfile.last_login,
-              };
+              const user = toAppUser(userProfile);
               
               set({ 
                 user, 
@@ -250,14 +257,21 @@ export const useAuthStore = create<AuthState>()(
               if (persisted && persisted.id) {
                 console.log('ℹ️ Using persisted user from Zustand:', persisted.name);
                 set({ isAuthenticated: true, isLoading: false, error: null });
-              } else {
-                // No persisted data either – sign out
-                await supabaseSignOut();
+              } else if (session.profile?.id === session.user.id && session.profile.role) {
+                // The backend session already contains the authoritative profile.
+                const user = toAppUser(session.profile);
                 set({ 
-                  user: null, 
-                  isAuthenticated: false, 
+                  user,
+                  isAuthenticated: true,
                   isLoading: false, 
                   error: null 
+                });
+              } else {
+                set({
+                  user: null,
+                  isAuthenticated: false,
+                  isLoading: false,
+                  error: 'Your provisioned profile could not be loaded. Ask an administrator to verify the account.',
                 });
               }
             }
