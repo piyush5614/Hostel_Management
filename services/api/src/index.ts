@@ -167,8 +167,7 @@ async function migrateExtendedSchema(): Promise<void> {
 // Seed default admin / warden accounts so they're always available
 // Note: This is now handled by database migrations
 async function seedDefaultAccounts(): Promise<void> {
-  log.debug('Default accounts (already seeded by Supabase migrations)');
-  // Seed data is now handled by migrations, this is a no-op for compatibility
+  log.debug('No default accounts are created automatically');
 }
 
 async function seedDefaultRooms(): Promise<void> {
@@ -194,9 +193,7 @@ async function seedDefaultRooms(): Promise<void> {
       return;
     }
 
-    log.debug('Seeding default room inventory to Supabase');
-    // Note: Room seeding should be done via database migrations, not at runtime
-    // Migrations handle bulk room creation with better transaction support
+    log.debug('No rooms are created automatically');
   } catch (err) {
     log.warn('Room seeding skipped (should be handled by migrations)', err);
   }

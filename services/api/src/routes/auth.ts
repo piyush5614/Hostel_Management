@@ -1,13 +1,81 @@
 import { Router, Request, Response } from 'express';
+import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../db/init.js';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
 import { authenticate, getRequestCollegeId } from '../middleware/auth.js';
-import { resolveCollegeId } from '../utils/tenant.js';
+import { DEFAULT_COLLEGE_ID, resolveCollegeId } from '../utils/tenant.js';
 import { log } from '../utils/logger.js';
-import { findLocalAuthUser, updateLocalLastLogin } from '../db/local-auth.js';
 
 const router = Router();
+
+async function authenticateSupabaseUser(db: Awaited<ReturnType<typeof getDb>>, email: string, password: string) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !publishableKey) return null;
+
+  const authClient = createClient(supabaseUrl, publishableKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: authData, error: authError } = await authClient.auth.signInWithPassword({ email, password });
+  if (authError || !authData.user?.email) return null;
+
+  const authUser = authData.user;
+  const normalizedEmail = (authUser.email || email).trim().toLowerCase();
+  const { data: linkedProfile, error: linkedProfileError } = await db
+    .from('users')
+    .select('*')
+    .eq('auth_id', authUser.id)
+    .maybeSingle();
+
+  if (linkedProfileError) throw linkedProfileError;
+  if (linkedProfile) return linkedProfile.is_active ? linkedProfile : null;
+
+  const { data: existingProfile, error: existingProfileError } = await db
+    .from('users')
+    .select('*')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (existingProfileError) throw existingProfileError;
+  if (existingProfile?.auth_id && existingProfile.auth_id !== authUser.id) {
+    throw new Error('This email is linked to a different Supabase Auth user.');
+  }
+
+  if (existingProfile) {
+    const { data: linked, error: linkError } = await db
+      .from('users')
+      .update({ auth_id: authUser.id, password: null })
+      .eq('id', existingProfile.id)
+      .select('*')
+      .single();
+
+    if (linkError) throw linkError;
+    return linked.is_active ? linked : null;
+  }
+
+  const metadataName = authUser.user_metadata?.full_name || authUser.user_metadata?.name;
+  const name = typeof metadataName === 'string' && metadataName.trim()
+    ? metadataName.trim()
+    : normalizedEmail.split('@')[0];
+  const { data: created, error: createError } = await db
+    .from('users')
+    .insert({
+      id: authUser.id,
+      auth_id: authUser.id,
+      college_id: DEFAULT_COLLEGE_ID,
+      name,
+      email: normalizedEmail,
+      password: null,
+      role: 'student',
+      is_active: true,
+    })
+    .select('*')
+    .single();
+
+  if (createError) throw createError;
+  return created;
+}
 
 // Signup – also accepts an optional `generatedId` (e.g. STAFF-0001, STU-0001)
 // If a user with the same email OR generatedId already exists, update their password instead.
@@ -156,6 +224,32 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const db = await getDb();
+    const authProfile = await authenticateSupabaseUser(db, email.trim().toLowerCase(), password);
+
+    if (authProfile) {
+      const collegeId = resolveCollegeId(authProfile.college_id);
+      const token = generateToken({
+        userId: authProfile.id,
+        email: authProfile.email,
+        role: authProfile.role,
+        collegeId,
+      });
+
+      res.json({
+        user: {
+          id: authProfile.id,
+          email: authProfile.email,
+          name: authProfile.name,
+          role: authProfile.role,
+          college_id: collegeId,
+          generated_id: authProfile.generated_id,
+          profile_image: authProfile.profile_image,
+          is_active: Boolean(authProfile.is_active),
+        },
+        token,
+      });
+      return;
+    }
 
     // Try matching by email first
     const { data: users, error: selectErr } = await db
@@ -164,35 +258,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       .eq('college_id', collegeId)
       .eq('email', email)
       .eq('is_active', true);
-
-    // Local development databases predate the Supabase migration. Keep login
-    // usable until the project migrations are applied to the remote database.
-    if (selectErr?.code === 'PGRST205') {
-      const localUser = await findLocalAuthUser(email);
-      if (!localUser || !(await comparePassword(password, localUser.password))) {
-        res.status(401).json({ error: 'Invalid credentials' });
-        return;
-      }
-
-      await updateLocalLastLogin(localUser.id);
-      const collegeId = resolveCollegeId(localUser.college_id);
-      const token = generateToken({ userId: localUser.id, email: localUser.email, role: localUser.role, collegeId });
-      log.auth('Local database login successful', localUser.id, email);
-      res.json({
-        user: {
-          id: localUser.id,
-          email: localUser.email,
-          name: localUser.name,
-          role: localUser.role,
-          college_id: collegeId,
-          generated_id: localUser.generated_id,
-          profile_image: localUser.profile_image,
-          is_active: Boolean(localUser.is_active),
-        },
-        token,
-      });
-      return;
-    }
 
     if (selectErr) {
       throw selectErr;

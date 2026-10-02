@@ -75,42 +75,38 @@ function getActiveCollegeId(): string {
  * account is available across browsers.
  */
 export const registerCredentialForLogin = (cred: RegisteredCredential) => {
-  // Local registry (mock fallback)
   const idx = credentialRegistry.findIndex(c => c.generatedId === cred.generatedId);
   if (idx === -1) {
     credentialRegistry.push(cred);
   } else {
     Object.assign(credentialRegistry[idx], cred);
   }
-
-  // Fire-and-forget: push to real backend
-  backendSignup(cred).catch(() => {
-    /* backend may not be running – that's fine */
-  });
 };
 
 export const getRegisteredCredentials = () => credentialRegistry;
 
 /* ──────────────── Backend helpers ──────────────── */
 
-async function backendSignup(cred: RegisteredCredential): Promise<void> {
-  const collegeId = cred.collegeId || getActiveCollegeId();
-  await fetch('/api/auth/signup', {
+export async function createAccount(account: {
+  email: string;
+  password: string;
+  name: string;
+  role: 'student' | 'staff' | 'warden';
+}): Promise<void> {
+  const collegeId = getActiveCollegeId();
+  const response = await fetch('/api/auth/signup', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-college-id': collegeId,
     },
-    body: JSON.stringify({
-      email: cred.email,
-      password: cred.generatedPassword,
-      name: cred.name,
-      role: cred.role,
-      generatedId: cred.generatedId,
-      collegeId,
-      profileImage: cred.profileImage,
-    }),
+    body: JSON.stringify({ ...account, email: account.email.trim().toLowerCase(), collegeId }),
   });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || 'Account creation failed. Please try again.');
+  }
 }
 
 interface BackendLoginResult {
@@ -122,6 +118,7 @@ interface BackendLoginResult {
     college_id?: string;
     generated_id?: string;
     profile_image?: string;
+    is_active?: boolean;
   };
   token: string;
 }
@@ -270,18 +267,7 @@ export const supabase = {
           factors: [],
         };
 
-        const mockSession = {
-          access_token: backendResult.token,
-          refresh_token: 'backend-refresh',
-          expires_in: 604800,
-          expires_at: Date.now() + 604800000,
-          token_type: 'bearer',
-          college_id: collegeId,
-          user: mockUser,
-        };
-
-        // Update or push into MOCK_USERS so getUserProfile works
-        const existingIdx = MOCK_USERS.findIndex(u => u.email === bu.email);
+        // Cache the profile in the session so reloads do not depend on MOCK_USERS.
         const backendProfile = {
           id: bu.id,
           auth_id: bu.id,
@@ -293,6 +279,20 @@ export const supabase = {
           is_active: true,
           last_login: new Date().toISOString(),
         };
+
+        const mockSession = {
+          access_token: backendResult.token,
+          refresh_token: 'backend-refresh',
+          expires_in: 604800,
+          expires_at: Date.now() + 604800000,
+          token_type: 'bearer',
+          college_id: collegeId,
+          profile: backendProfile,
+          user: mockUser,
+        };
+
+        // Update or push into MOCK_USERS for compatibility with existing mock data.
+        const existingIdx = MOCK_USERS.findIndex(u => u.email === bu.email);
         if (existingIdx !== -1) {
           // Update existing entry with correct backend UUID
           MOCK_USERS[existingIdx].id = bu.id;
@@ -317,8 +317,20 @@ export const supabase = {
       console.log('⚠️  Backend unavailable – falling back to mock auth');
       await new Promise(resolve => setTimeout(resolve, 400));
 
-      // Demo account sign-in is temporarily disabled. Existing demo data is preserved.
+      // Restore built-in demo users and still support registered credentials.
       let user: typeof MOCK_USERS[number] | undefined;
+
+      if (!user) {
+        user = MOCK_USERS.find(
+          (entry) =>
+            entry.password &&
+            ((entry.email?.toLowerCase() === identifier.toLowerCase()) ||
+             (entry.profile?.email?.toLowerCase() === identifier.toLowerCase()) ||
+             (entry.profile?.staffId && `staff-${entry.profile.staffId}`.toLowerCase() === identifier.toLowerCase()) ||
+             (entry.profile?.studentId && `stu-${entry.profile.studentId}`.toLowerCase() === identifier.toLowerCase())) &&
+            entry.password === password
+        );
+      }
 
       // Try credential registry
       if (!user) {
@@ -519,6 +531,16 @@ export const getUserProfile = async (authId: string) => {
     const stored = localStorage.getItem('tc-hostel-enhanced-session');
     if (stored) {
       const session = JSON.parse(stored);
+      const persistedProfile = session?.profile;
+      if (persistedProfile?.id === authId && persistedProfile.email && persistedProfile.role) {
+        console.log('🔎 Auth diagnostic: getUserProfile resolved from persisted session', {
+          authId,
+          profile: persistedProfile,
+        });
+        setActiveCollegeId(persistedProfile.college_id || getActiveCollegeId());
+        return persistedProfile;
+      }
+
       const token = session?.access_token;
       if (token && token !== 'mock-access-token') {
         const res = await fetchWithTimeout('/api/auth/me', {

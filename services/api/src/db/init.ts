@@ -27,12 +27,14 @@ export async function initDb(): Promise<SupabaseClient> {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
-    log.fatal('Supabase configuration missing', {
+  if (!supabaseUrl || !supabaseKey || !supabaseUrl.includes('supabase.co')) {
+    log.fatal('Supabase configuration is invalid or missing. The server cannot start without a real project URL and key.', {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseKey,
+      url: supabaseUrl ? supabaseUrl.substring(0, 30) : null,
+      check: 'Verify SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and the project is active in Supabase.',
     });
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required');
+    throw new Error('Supabase configuration is invalid or missing. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before starting the app.');
   }
 
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
@@ -45,15 +47,19 @@ export async function initDb(): Promise<SupabaseClient> {
     },
   });
 
-  // Test connection by querying colleges table
   try {
-    const { count, error } = await supabaseClient
-      .from('colleges')
-      .select('id', { count: 'exact', head: true });
+    const { error } = await supabaseClient
+      .from('users')
+      .select('id')
+      .limit(1);
 
     if (error) {
-      log.fatal('Failed to connect to Supabase', error);
-      throw error;
+      log.fatal('Supabase connection failed. Check DNS, project status, and API configuration. This is not a silent fallback.', {
+        error: error.message ?? String(error),
+        url: supabaseUrl.substring(0, 30) + '...',
+        hint: 'If the project is paused, deleted, or the hostname is stale, update SUPABASE_URL and the project credentials before retrying.',
+      });
+      throw new Error('Supabase connection failed. Check DNS resolution, project status, and the configured Supabase URL/key pair.');
     }
 
     log.info('Connected to Supabase successfully', {
@@ -61,7 +67,10 @@ export async function initDb(): Promise<SupabaseClient> {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.fatal('Supabase connection test failed', error);
+    log.fatal('Supabase connection test failed. Startup is blocked until the real database is reachable.', {
+      detail: error instanceof Error ? error.message : String(error),
+      url: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : null,
+    });
     throw error;
   }
 

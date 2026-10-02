@@ -4,8 +4,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Modal } from '../components/ui/modal';
-import { School, AlertCircle, Eye, EyeOff, Mail, Sparkles, Zap, Shield, Building2, Users, Star, KeyRound } from 'lucide-react';
+import { School, AlertCircle, Eye, EyeOff, Mail, Sparkles, Zap, Shield, Building2, Users, Star, KeyRound, UserPlus, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
+import { createAccount } from '../lib/supabase';
 import { toast } from 'sonner';
 import { ErrorBoundary, LoadingState } from '../components/error-boundary/error-boundary';
 
@@ -25,6 +26,14 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Account creation state
+  const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false);
+  const [accountName, setAccountName] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountRole, setAccountRole] = useState<'student' | 'staff' | 'warden'>('student');
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   // Password reset state
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -141,6 +150,40 @@ export function LoginPage() {
       toast.error(error.message || 'Failed to send password reset email');
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountName.trim() || !validateEmail(accountEmail.trim())) {
+      toast.error('Enter your name and a valid email address');
+      return;
+    }
+    if (accountPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    try {
+      setIsCreatingAccount(true);
+      await createAccount({
+        name: accountName.trim(),
+        email: accountEmail.trim(),
+        password: accountPassword,
+        role: accountRole,
+      });
+      setEmail(accountEmail.trim().toLowerCase());
+      setPassword(accountPassword);
+      setIsCreateAccountOpen(false);
+      setAccountName('');
+      setAccountEmail('');
+      setAccountPassword('');
+      toast.success('Account created. Signing you in now.');
+      await login(accountEmail.trim().toLowerCase(), accountPassword);
+    } catch (error: any) {
+      toast.error(error.message || 'Could not create your account');
+    } finally {
+      setIsCreatingAccount(false);
     }
   };
 
@@ -326,9 +369,8 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {/* Demo account controls are temporarily hidden. */}
-          {/*
-            <div className="mt-8">
+          <div className="mt-8">
+            <div className="grid grid-cols-2 gap-3">
               <Button 
                 type="button"
                 variant="outline" 
@@ -412,15 +454,30 @@ export function LoginPage() {
                 <p className="text-xs leading-relaxed">
                   Click any demo account button for instant access.<br />
                   <span className="font-mono bg-white/70 px-2 py-1 rounded-md dark:bg-black/30 text-primary-700 dark:text-primary-300">
-                    New secure passwords implemented
+                    Demo credentials are active again
                   </span>
                 </p>
               </div>
             </div>
-          */}
+          </div>
 
           {/* Enhanced help section */}
           <div className="mt-8 text-center">
+            <div className="mb-6 flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="h-px flex-1 bg-border" />
+              <span>New to TC Hostel Connect?</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateAccountOpen(true)}
+              disabled={isLoading}
+              className="mb-6 h-11 w-full border-primary-200 bg-primary-50/60 font-semibold text-primary-700 transition-all hover:scale-[1.02] hover:border-primary-400 hover:bg-primary-100"
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create a new account
+            </Button>
             <div className="rounded-xl bg-gradient-to-r from-muted/30 to-muted/50 p-4 border border-muted shadow-lg">
               <div className="flex items-center justify-center mb-2">
                 <Mail className="h-4 w-4 mr-2 text-primary-600" />
@@ -444,6 +501,42 @@ export function LoginPage() {
       </Card>
 
       {/* Enhanced password reset modal */}
+      <Modal
+        isOpen={isCreateAccountOpen}
+        onClose={() => !isCreatingAccount && setIsCreateAccountOpen(false)}
+        title="Create your account"
+        size="sm"
+      >
+        <form onSubmit={handleCreateAccount} className="space-y-5">
+          <div className="rounded-xl border border-primary-200 bg-primary-50 p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" />
+              <p className="text-sm leading-relaxed text-primary-800">
+                Use this account to sign in to the hostel portal. Your details are stored securely.
+              </p>
+            </div>
+          </div>
+          <Input label="Full name" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="e.g. Abhay Sahu" disabled={isCreatingAccount} required />
+          <Input label="Email address" type="email" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} placeholder="you@example.com" disabled={isCreatingAccount} required />
+          <Input label="Password" type="password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} placeholder="At least 8 characters" disabled={isCreatingAccount} minLength={8} required />
+          <div className="space-y-2">
+            <label htmlFor="account-role" className="text-sm font-medium">Account type</label>
+            <select id="account-role" value={accountRole} onChange={(e) => setAccountRole(e.target.value as typeof accountRole)} disabled={isCreatingAccount} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="student">Student</option>
+              <option value="staff">Staff</option>
+              <option value="warden">Warden</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => setIsCreateAccountOpen(false)} disabled={isCreatingAccount}>Cancel</Button>
+            <Button type="submit" isLoading={isCreatingAccount} disabled={isCreatingAccount} className="bg-gradient-to-r from-primary-600 to-primary-700">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create account
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal
         isOpen={isResetModalOpen}
         onClose={() => {

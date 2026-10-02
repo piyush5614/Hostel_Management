@@ -12,11 +12,37 @@ interface EnvCheckResult {
   errors: string[];
 }
 
-const REQUIRED_VARS = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET'];
+const REQUIRED_VARS = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET', 'ALLOWED_ORIGINS'];
 
-const RECOMMENDED_VARS = ['NODE_ENV', 'LOG_LEVEL', 'PORT', 'ALLOWED_ORIGINS'];
+const RECOMMENDED_VARS = ['NODE_ENV', 'LOG_LEVEL', 'PORT'];
 
-const PRODUCTION_REQUIRED = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET', 'NODE_ENV'];
+const PRODUCTION_REQUIRED = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET', 'ALLOWED_ORIGINS', 'NODE_ENV'];
+
+const PLACEHOLDER_VALUES = new Set([
+  'your-project-id',
+  'your-project',
+  'example.com',
+  'changeme',
+  'change-me',
+  'replace-me',
+  'dev-secret-key-32-chars-minimum',
+  'placeholder',
+  'todo',
+  'localhost',
+]);
+
+function hasPlaceholderValue(value?: string): boolean {
+  if (!value) {
+    return true;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  return PLACEHOLDER_VALUES.has(normalized) || normalized.includes('your-project') || normalized.includes('replace-me') || normalized.includes('changeme');
+}
 
 /**
  * Validate environment variables and log warnings
@@ -34,23 +60,26 @@ export function validateEnvironment(): EnvCheckResult {
   const requiredToCheck = isProd ? PRODUCTION_REQUIRED : REQUIRED_VARS;
 
   for (const varName of requiredToCheck) {
-    if (!process.env[varName]) {
-      result.errors.push(`Missing required environment variable: ${varName}`);
+    const value = process.env[varName]?.trim();
+    if (!value || hasPlaceholderValue(value)) {
+      result.errors.push(`Missing or placeholder environment variable: ${varName}`);
       result.valid = false;
     }
   }
 
   // Check JWT_SECRET length
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    result.warnings.push(
+    result.errors.push(
       `JWT_SECRET is too short (${process.env.JWT_SECRET.length} chars). ` +
-        'Recommended minimum: 32 characters for security.'
+        'Use a real random secret with at least 32 characters.'
     );
+    result.valid = false;
   }
 
   // Check Supabase URL format
   if (process.env.SUPABASE_URL && !process.env.SUPABASE_URL.includes('supabase.co')) {
-    result.warnings.push('SUPABASE_URL does not look like a valid Supabase URL (should include "supabase.co")');
+    result.errors.push('SUPABASE_URL does not look like a valid Supabase URL (should include "supabase.co")');
+    result.valid = false;
   }
 
   // Check recommended variables

@@ -10,6 +10,8 @@ import {
 } from '../lib/supabase';
 import { User, UserRole } from '../types';
 
+let initializationInFlight = false;
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -189,6 +191,12 @@ export const useAuthStore = create<AuthState>()(
       },
 
       initialize: async () => {
+        if (initializationInFlight) {
+          console.log('🔎 Auth diagnostic: initialize skipped because another check is in flight');
+          return;
+        }
+
+        initializationInFlight = true;
         try {
           console.log('🔎 Auth diagnostic: initialize started');
           set({ isLoading: true, error: null });
@@ -271,6 +279,8 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false, 
             error: null 
           });
+        } finally {
+          initializationInFlight = false;
         }
       },
 
