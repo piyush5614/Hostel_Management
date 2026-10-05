@@ -5,14 +5,12 @@
 
 import express, { Request, Response } from 'express';
 import { Server } from 'socket.io';
-import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../middleware/auth.js';
-
-// In-memory storage for notifications
-const notificationsStore = new Map<string, any[]>();
+import { getDb } from '../db/init.js';
+import { resolveCollegeId } from '../utils/tenant.js';
 
 interface Notification {
-  id: string;
+  id?: string;
   user_id: string;
   type: string;
   title: string;
@@ -34,27 +32,41 @@ export function createNotificationRoutes(io?: Server) {
   router.get('/', async (req: Request, res: Response) => {
     try {
       const userId = req.user!.userId;
+      const collegeId = resolveCollegeId(req.user?.collegeId);
+      const db = await getDb();
 
       const limit = parseInt(req.query.limit as string) || 50;
       const cursor = req.query.cursor as string | undefined;
 
-      const userNotifications = notificationsStore.get(userId) || [];
-      const sorted = [...userNotifications].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      let query = db
+        .from('notifications')
+        .select('*')
+        .eq('college_id', collegeId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(Math.min(Math.max(limit, 1), 100));
 
-      let startIndex = 0;
       if (cursor) {
-        const cursorIndex = sorted.findIndex((n) => n.id === cursor);
-        startIndex = cursorIndex + 1;
+        const { data: cursorNotification } = await db
+          .from('notifications')
+          .select('created_at')
+          .eq('id', cursor)
+          .eq('college_id', collegeId)
+          .eq('user_id', userId)
+          .single();
+        if (cursorNotification?.created_at) {
+          query = query.lt('created_at', cursorNotification.created_at);
+        }
       }
 
-      const pageItems = sorted.slice(startIndex, startIndex + limit);
-      const nextCursor = startIndex + limit < sorted.length ? pageItems[pageItems.length - 1]?.id : undefined;
+      const { data: pageItems, error } = await query;
+      if (error) throw error;
 
       res.json({
-        data: pageItems,
-        cursor: nextCursor,
+        data: pageItems || [],
+        cursor: pageItems && pageItems.length === Math.min(Math.max(limit, 1), 100)
+          ? pageItems[pageItems.length - 1]?.id
+          : undefined,
       });
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -69,11 +81,16 @@ export function createNotificationRoutes(io?: Server) {
   router.get('/:id', async (req: Request, res: Response) => {
     try {
       const userId = req.user!.userId;
-
-      const userNotifications = notificationsStore.get(userId) || [];
-      const notification = userNotifications.find((n) => n.id === req.params.id);
-
-      if (!notification) {
+      const collegeId = resolveCollegeId(req.user?.collegeId);
+      const db = await getDb();
+      const { data: notification, error } = await db
+        .from('notifications')
+        .select('*')
+        .eq('id', req.params.id)
+        .eq('college_id', collegeId)
+        .eq('user_id', userId)
+        .single();
+      if (error || !notification) {
         return res.status(404).json({ error: 'Not found' });
       }
 
@@ -91,19 +108,30 @@ export function createNotificationRoutes(io?: Server) {
   router.patch('/:id', async (req: Request, res: Response) => {
     try {
       const userId = req.user!.userId;
-
-      const userNotifications = notificationsStore.get(userId) || [];
-      const notification = userNotifications.find((n) => n.id === req.params.id);
-
-      if (!notification) {
+      const collegeId = resolveCollegeId(req.user?.collegeId);
+      const db = await getDb();
+      const { data: notification, error: fetchError } = await db
+        .from('notifications')
+        .select('*')
+        .eq('id', req.params.id)
+        .eq('college_id', collegeId)
+        .eq('user_id', userId)
+        .single();
+      if (fetchError || !notification) {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      notification.read = true;
-      notification.read_at = new Date().toISOString();
-      notificationsStore.set(userId, userNotifications);
+      const { data: updated, error } = await db
+        .from('notifications')
+        .update({ read: true, read_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .eq('college_id', collegeId)
+        .eq('user_id', userId)
+        .select('*')
+        .single();
+      if (error) throw error;
 
-      res.json(notification);
+      res.json(updated);
     } catch (error) {
       console.error('Error updating notification:', error);
       res.status(500).json({ error: 'Failed to update notification' });
@@ -117,13 +145,15 @@ export function createNotificationRoutes(io?: Server) {
   router.put('/read-all', async (req: Request, res: Response) => {
     try {
       const userId = req.user!.userId;
-
-      const userNotifications = notificationsStore.get(userId) || [];
-      userNotifications.forEach((n) => {
-        n.read = true;
-        n.read_at = new Date().toISOString();
-      });
-      notificationsStore.set(userId, userNotifications);
+      const collegeId = resolveCollegeId(req.user?.collegeId);
+      const db = await getDb();
+      const { error } = await db
+        .from('notifications')
+        .update({ read: true, read_at: new Date().toISOString() })
+        .eq('college_id', collegeId)
+        .eq('user_id', userId)
+        .eq('read', false);
+      if (error) throw error;
 
       res.json({ success: true });
     } catch (error) {
@@ -139,10 +169,15 @@ export function createNotificationRoutes(io?: Server) {
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
       const userId = req.user!.userId;
-
-      let userNotifications = notificationsStore.get(userId) || [];
-      userNotifications = userNotifications.filter((n) => n.id !== req.params.id);
-      notificationsStore.set(userId, userNotifications);
+      const collegeId = resolveCollegeId(req.user?.collegeId);
+      const db = await getDb();
+      const { error } = await db
+        .from('notifications')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('college_id', collegeId)
+        .eq('user_id', userId);
+      if (error) throw error;
 
       res.json({ success: true });
     } catch (error) {
@@ -154,15 +189,15 @@ export function createNotificationRoutes(io?: Server) {
   /**
    * Helper function to create notifications from other routes
    */
-  function createNotification(
+  async function createNotification(
     userId: string,
     type: string,
     title: string,
     body: string,
     data?: Record<string, any>
-  ): Notification {
+  ): Promise<Notification> {
+    const db = await getDb();
     const notification: Notification = {
-      id: uuidv4(),
       user_id: userId,
       type,
       title,
@@ -172,16 +207,19 @@ export function createNotificationRoutes(io?: Server) {
       created_at: new Date().toISOString(),
     };
 
-    const userNotifications = notificationsStore.get(userId) || [];
-    userNotifications.push(notification);
-    notificationsStore.set(userId, userNotifications);
+    const { data: created, error } = await db
+      .from('notifications')
+      .insert([{ ...notification, college_id: resolveCollegeId(undefined) }])
+      .select('*')
+      .single();
+    if (error) throw error;
 
     // Emit real-time event via Socket.io if available
     if (io) {
-      io.to(`user:${userId}`).emit('notification:new', notification);
+      io.to(`user:${userId}`).emit('notification:new', created);
     }
 
-    return notification;
+    return created;
   }
 
   // Attach helper to express app for use in other routes
