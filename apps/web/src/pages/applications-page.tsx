@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockApplications } from '../store/mock-data';
 import { Application } from '../types';
+import { createApplication, getApplications, reviewApplication } from '../services/applications';
 import { FileText, Plus, Eye, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
 export function ApplicationsPage() {
   const user = useAuthStore((state) => state.user);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [formData, setFormData] = useState({
@@ -22,56 +26,66 @@ export function ApplicationsPage() {
   });
 
   const isAdminOrWarden = user?.role === 'admin' || user?.role === 'warden';
-  const canCreateApplication = user?.role === 'student' || user?.role === 'staff';
+  const canCreateApplication = user?.role === 'student';
 
-  // Admin/Warden see all applications; students/staff see only their own
-  const visibleApplications = isAdminOrWarden
-    ? mockApplications
-    : mockApplications.filter(app => app.studentId === user?.id);
+  const loadApplications = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const rows = await getApplications();
+      setApplications(rows);
+      setSelectedApplication((current) => current ? rows.find((row) => row.id === current.id) || null : null);
+    } catch (loadError) {
+      setApplications([]);
+      setSelectedApplication(null);
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load applications');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const getApplicationStats = () => {
-    const total = mockApplications.length;
-    const pending = mockApplications.filter(a => a.status === 'pending').length;
-    const approved = mockApplications.filter(a => a.status === 'approved').length;
-    const rejected = mockApplications.filter(a => a.status === 'rejected').length;
+    const total = applications.length;
+    const pending = applications.filter(a => a.status === 'pending').length;
+    const approved = applications.filter(a => a.status === 'approved').length;
+    const rejected = applications.filter(a => a.status === 'rejected').length;
     return { total, pending, approved, rejected };
   };
 
+  useEffect(() => {
+    if (user) void loadApplications();
+  }, [user, loadApplications]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const newApplication: Application = {
-      id: Date.now().toString(),
-      studentId: user?.id || '',
-      ...formData,
-      urgency: 'medium',
-      status: 'pending',
-      submittedAt: new Date().toISOString(),
-    };
-
-    mockApplications.push(newApplication);
-    toast.success('Application submitted successfully!');
-    setIsCreateModalOpen(false);
-    setFormData({
-      type: 'leave',
-      title: '',
-      description: '',
-    });
+    setIsSaving(true);
+    try {
+      const created = await createApplication({ ...formData, urgency: 'medium' });
+      setApplications((current) => [created, ...current]);
+      setSelectedApplication(created);
+      toast.success('Application submitted successfully!');
+      setIsCreateModalOpen(false);
+      setFormData({ type: 'leave', title: '', description: '' });
+    } catch (submitError) {
+      toast.error(submitError instanceof Error ? submitError.message : 'Failed to submit application');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleStatusUpdate = (applicationId: string, newStatus: Application['status']) => {
-    const appIndex = mockApplications.findIndex(app => app.id === applicationId);
-    if (appIndex !== -1) {
-      mockApplications[appIndex] = {
-        ...mockApplications[appIndex],
-        status: newStatus,
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: user?.id,
-      };
-      if (selectedApplication?.id === applicationId) {
-        setSelectedApplication({ ...mockApplications[appIndex] });
-      }
+  const handleStatusUpdate = async (applicationId: string, newStatus: Application['status']) => {
+    setIsSaving(true);
+    try {
+      const updated = await reviewApplication(applicationId, newStatus);
+      setApplications((current) => current.map((application) => (
+        application.id === updated.id ? updated : application
+      )));
+      setSelectedApplication((current) => current?.id === updated.id ? updated : current);
       toast.success(`Application ${newStatus}!`);
+    } catch (reviewError) {
+      toast.error(reviewError instanceof Error ? reviewError.message : 'Failed to update application');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -85,6 +99,7 @@ export function ApplicationsPage() {
   };
 
   const stats = getApplicationStats();
+  const visibleApplications = applications;
 
   return (
     <div className="space-y-6">
@@ -156,7 +171,10 @@ export function ApplicationsPage() {
               <CardTitle>{isAdminOrWarden ? 'All Applications' : 'My Applications'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              {error && <p className="mb-4 rounded-md bg-error-50 p-3 text-sm text-error-700">{error}</p>}
+              {isLoading ? (
+                <p className="py-12 text-center text-muted-foreground">Loading applications...</p>
+              ) : <div className="space-y-4">
                 {visibleApplications.map((application) => (
                   <div
                     key={application.id}
@@ -189,7 +207,7 @@ export function ApplicationsPage() {
                               className="bg-success-600 hover:bg-success-700 text-white"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleStatusUpdate(application.id, 'approved');
+                                void handleStatusUpdate(application.id, 'approved');
                               }}
                             >
                               <CheckCircle className="mr-1 h-3 w-3" />
@@ -201,7 +219,7 @@ export function ApplicationsPage() {
                               className="text-error-600 border-error-300 hover:bg-error-50"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleStatusUpdate(application.id, 'rejected');
+                                void handleStatusUpdate(application.id, 'rejected');
                               }}
                             >
                               <XCircle className="mr-1 h-3 w-3" />
@@ -230,7 +248,7 @@ export function ApplicationsPage() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
             </CardContent>
           </Card>
         </div>
@@ -284,7 +302,8 @@ export function ApplicationsPage() {
                   <div className="flex space-x-2 pt-2 border-t">
                     <Button
                       className="flex-1 bg-success-600 hover:bg-success-700 text-white"
-                      onClick={() => handleStatusUpdate(selectedApplication.id, 'approved')}
+                      disabled={isSaving}
+                      onClick={() => void handleStatusUpdate(selectedApplication.id, 'approved')}
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />
                       Approve
@@ -292,7 +311,8 @@ export function ApplicationsPage() {
                     <Button
                       variant="outline"
                       className="flex-1 text-error-600 border-error-300 hover:bg-error-50"
-                      onClick={() => handleStatusUpdate(selectedApplication.id, 'rejected')}
+                      disabled={isSaving}
+                      onClick={() => void handleStatusUpdate(selectedApplication.id, 'rejected')}
                     >
                       <XCircle className="mr-2 h-4 w-4" />
                       Reject
@@ -357,7 +377,7 @@ export function ApplicationsPage() {
             <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={isSaving}>
               Submit Application
             </Button>
           </div>

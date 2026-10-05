@@ -5,6 +5,10 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
+const APPLICATION_TYPES = ['leave', 'room-change', 'course-change', 'fee-extension', 'document-request', 'other'] as const;
+const APPLICATION_STATUSES = ['pending', 'under-review', 'approved', 'rejected'] as const;
+
+const applicationSelect = '*, students(user_id, enrollment_number, users(name))';
 
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -14,7 +18,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     let query = db
       .from('applications')
-      .select('*, students(user_id, enrollment_number, users(name))')
+      .select(applicationSelect)
       .eq('college_id', collegeId)
       .order('submitted_at', { ascending: false });
 
@@ -59,11 +63,16 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
     const user = req.user;
     const collegeId = resolveCollegeId(user?.collegeId);
 
-    const title = req.body.title;
-    const description = req.body.description || '';
+    const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+    const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
 
     if (!title) {
       res.status(400).json({ error: 'title is required' });
+      return;
+    }
+
+    if (req.body.type && !APPLICATION_TYPES.includes(req.body.type)) {
+      res.status(400).json({ error: 'Invalid application type' });
       return;
     }
 
@@ -120,7 +129,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
 
     const { data: created, error: fetchError } = await db
       .from('applications')
-      .select('*')
+      .select(applicationSelect)
       .eq('id', applicationId)
       .eq('college_id', collegeId)
       .single();
@@ -138,10 +147,14 @@ router.patch('/:id/review', authenticate, authorize('admin', 'warden'), async (r
   try {
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
-    const status = req.body.status;
+    const status = typeof req.body.status === 'string' ? req.body.status.trim() : '';
 
     if (!status) {
       res.status(400).json({ error: 'status is required' });
+      return;
+    }
+    if (!APPLICATION_STATUSES.includes(status as typeof APPLICATION_STATUSES[number])) {
+      res.status(400).json({ error: 'Invalid application status' });
       return;
     }
 
@@ -163,6 +176,7 @@ router.patch('/:id/review', authenticate, authorize('admin', 'warden'), async (r
         status,
         reviewed_at: new Date().toISOString(),
         reviewed_by: req.user?.userId,
+        comments: typeof req.body.comments === 'string' ? req.body.comments.trim() || null : undefined,
       })
       .eq('id', req.params.id)
       .eq('college_id', collegeId);
@@ -171,7 +185,7 @@ router.patch('/:id/review', authenticate, authorize('admin', 'warden'), async (r
 
     const { data: updated, error: refetchError } = await db
       .from('applications')
-      .select('*')
+      .select(applicationSelect)
       .eq('id', req.params.id)
       .eq('college_id', collegeId)
       .single();

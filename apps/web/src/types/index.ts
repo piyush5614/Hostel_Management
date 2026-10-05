@@ -264,7 +264,7 @@ export interface Report {
 export interface Application {
   id: string;
   studentId: string;
-  type: 'leave' | 'room-change' | 'course-change' | 'document-request' | 'other';
+  type: 'leave' | 'room-change' | 'course-change' | 'fee-extension' | 'document-request' | 'other';
   title: string;
   description: string;
   status: 'pending' | 'approved' | 'rejected' | 'under-review';
