@@ -1192,7 +1192,8 @@ export const syncAttendanceFromApi = async (filters?: {
     if (filters?.roomId) params.set('roomId', filters.roomId);
 
     const query = params.toString();
-    const rows = await apiRequest<any[]>(`/attendance${query ? `?${query}` : ''}`, { method: 'GET' });
+    const response = await apiRequest<any>(`/attendance${query ? `?${query}` : ''}`, { method: 'GET' });
+    const rows = Array.isArray(response) ? response : response?.data;
 
     if (Array.isArray(rows)) {
       const mapped = rows.map(mapAttendanceFromApi);
@@ -1209,7 +1210,11 @@ export const syncAttendanceFromApi = async (filters?: {
       eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
     }
   } catch (error) {
-    console.warn('Failed to sync attendance from API, using local cache:', error);
+    console.error('Failed to sync attendance from API:', error);
+    if (!filters?.date && !filters?.studentId && !filters?.roomId) {
+      mockAttendance = [];
+      eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
+    }
   }
 
   return mockAttendance;
@@ -1220,25 +1225,11 @@ export const upsertAttendanceRecords = async (records: Omit<Attendance, 'id' | '
     return;
   }
 
-  records.forEach((record) => {
-    upsertAttendanceRecord({
-      id: `${Date.now()}-${record.studentId}`,
-      ...record,
-      recordedAt: new Date().toISOString(),
-    });
-  });
-
-  saveToStorage();
-  eventBus.emit(EVENTS.ATTENDANCE_UPDATED);
-
-  void apiRequest<{ success: boolean; count: number }>('/attendance/bulk-upsert', {
+  await apiRequest<{ success: boolean; count: number }>('/attendance/bulk-upsert', {
     method: 'POST',
     body: JSON.stringify({ records }),
-  })
-    .then(() => syncAttendanceFromApi(records[0]?.date ? { date: records[0].date } : undefined))
-    .catch((error) => {
-      console.warn('Failed to persist attendance in API, kept local state:', error);
-    });
+  });
+  await syncAttendanceFromApi(records[0]?.date ? { date: records[0].date } : undefined);
 };
 
 // Attendance sheet management

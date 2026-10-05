@@ -13,6 +13,7 @@ import {
   createAttendanceSheet,
   submitAttendanceToAdmin,
   syncAttendanceFromApi,
+  syncStudentsFromApi,
   upsertAttendanceRecords,
   exportData,
   getLinkedStudentId
@@ -42,7 +43,7 @@ export function AttendancePage() {
     if (!user?.id) {
       return;
     }
-    void syncAttendanceFromApi();
+    void Promise.all([syncStudentsFromApi(), syncAttendanceFromApi()]);
   }, [user?.id, isStudent]);
 
   // For student: resolve their linked student record
