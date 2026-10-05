@@ -277,6 +277,33 @@ export interface Application {
   expectedCompletionDate?: string;
 }
 
+export interface Event {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  category: 'academic' | 'cultural' | 'sports' | 'social' | 'official';
+  visibility: 'public' | 'students-only' | 'staff-only' | 'private';
+  maxParticipants?: number;
+  registrationRequired: boolean;
+  registrationDeadline?: string;
+  organizer: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  status: 'draft' | 'published' | 'cancelled';
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  studentId: string;
+  registeredAt: string;
+  status: 'registered' | 'attended' | 'cancelled';
+}
+
 export interface StaffShift {
   id: string;
   staffId: string;

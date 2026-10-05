@@ -24,11 +24,13 @@ import emailRoutes from './routes/email.js';
 import leaveRoutes from './routes/leave.js';
 import attendanceRoutes from './routes/attendance.js';
 import staffRoutes from './routes/staff.js';
+import taskRoutes from './routes/tasks.js';
 import maintenanceRoutes from './routes/maintenance.js';
 import visitorRoutes from './routes/visitors.js';
 import messageRoutes from './routes/messages.js';
 import reportRoutes from './routes/reports.js';
 import applicationRoutes from './routes/applications.js';
+import eventRoutes from './routes/events.js';
 import { createNotificationRoutes } from './routes/notifications.js';
 
 const app = express();
@@ -76,11 +78,13 @@ app.use('/api/email', emailRoutes);
 app.use('/api/leave-requests', leaveRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/staff-tasks', taskRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/events', eventRoutes);
 
 // Initialize WebSocket and attach notification routes
 const httpServer = http.createServer(app);

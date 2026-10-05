@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockEvents, mockEventRegistrations } from '../store/mock-data';
-import { Event, EventRegistration } from '../types';
+import { Event } from '../types';
+import { eventsService } from '../services/events';
 import { Calendar, Plus, Edit, Trash2, Users, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -17,6 +17,9 @@ export function EventsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [registrations, setRegistrations] = useState<Awaited<ReturnType<typeof eventsService.list>>['registrations']>([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -31,9 +34,23 @@ export function EventsPage() {
   });
 
   const canManageEvents = user?.role === 'admin' || user?.role === 'warden';
-  
-  // Filter events based on visibility and user role
-  const visibleEvents = mockEvents.filter(event => {
+  const reload = async () => {
+    try {
+      setLoading(true);
+      const result = await eventsService.list();
+      setEvents(result.events);
+      setRegistrations(result.registrations);
+      setSelectedEvent((current) => current ? result.events.find((event) => event.id === current.id) || null : null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load events');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void reload(); }, []);
+
+  const visibleEvents = events.filter(event => {
     if (event.visibility === 'public') return true;
     if (event.visibility === 'students-only' && user?.role === 'student') return true;
     if (event.visibility === 'staff-only' && (user?.role === 'admin' || user?.role === 'warden' || user?.role === 'staff')) return true;
@@ -54,24 +71,22 @@ export function EventsPage() {
       status: 'published' as const,
     };
 
-    if (editingEvent) {
-      // Update existing event
-      const index = mockEvents.findIndex(e => e.id === editingEvent.id);
-      if (index !== -1) {
-        mockEvents[index] = { ...editingEvent, ...eventData, updatedAt: new Date().toISOString() };
+    try {
+      if (editingEvent) {
+        await eventsService.update(editingEvent.id, eventData);
         toast.success('Event updated successfully!');
+        await reload();
+        setIsEditModalOpen(false);
+        setEditingEvent(null);
+      } else {
+        await eventsService.create(eventData);
+        toast.success('Event created successfully!');
+        await reload();
+        setIsCreateModalOpen(false);
       }
-      setIsEditModalOpen(false);
-      setEditingEvent(null);
-    } else {
-      // Create new event
-      const newEvent: Event = {
-        id: Date.now().toString(),
-        ...eventData,
-      };
-      mockEvents.push(newEvent);
-      toast.success('Event created successfully!');
-      setIsCreateModalOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save event');
+      return;
     }
 
     // Reset form
@@ -106,49 +121,42 @@ export function EventsPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = (event: Event) => {
+  const handleDelete = async (event: Event) => {
     if (window.confirm(`Are you sure you want to delete "${event.title}"?`)) {
-      const index = mockEvents.findIndex(e => e.id === event.id);
-      if (index !== -1) {
-        mockEvents.splice(index, 1);
+      try {
+        await eventsService.remove(event.id);
+        await reload();
         toast.success('Event deleted successfully!');
-        if (selectedEvent?.id === event.id) {
-          setSelectedEvent(null);
-        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to delete event');
       }
     }
   };
 
-  const handleRegister = (event: Event) => {
-    const existingRegistration = mockEventRegistrations.find(
-      reg => reg.eventId === event.id && reg.studentId === user?.id
-    );
-
-    if (existingRegistration) {
-      toast.error('You are already registered for this event!');
-      return;
+  const handleRegister = async (event: Event) => {
+    try {
+      if (isRegistered(event.id)) {
+        await eventsService.unregister(event.id);
+        toast.success('Registration cancelled.');
+      } else {
+        await eventsService.register(event.id);
+        toast.success('Successfully registered for the event!');
+      }
+      const result = await eventsService.list();
+      setRegistrations(result.registrations);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update registration');
     }
-
-    const newRegistration: EventRegistration = {
-      id: Date.now().toString(),
-      eventId: event.id,
-      studentId: user?.id || '',
-      registeredAt: new Date().toISOString(),
-      status: 'registered',
-    };
-
-    mockEventRegistrations.push(newRegistration);
-    toast.success('Successfully registered for the event!');
   };
 
   const isRegistered = (eventId: string) => {
-    return mockEventRegistrations.some(
+    return registrations.some(
       reg => reg.eventId === eventId && reg.studentId === user?.id
     );
   };
 
   const getRegistrationCount = (eventId: string) => {
-    return mockEventRegistrations.filter(reg => reg.eventId === eventId).length;
+    return registrations.filter(reg => reg.eventId === eventId && reg.status !== 'cancelled').length;
   };
 
   const getCategoryColor = (category: Event['category']) => {
@@ -177,7 +185,7 @@ export function EventsPage() {
         {/* Events List */}
         <div className="md:col-span-2">
           <div className="grid gap-4">
-            {visibleEvents.map((event) => (
+            {loading ? <Card><CardContent className="py-12 text-center">Loading events...</CardContent></Card> : visibleEvents.map((event) => (
               <Card
                 key={event.id}
                 className={cn(
