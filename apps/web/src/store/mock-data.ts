@@ -898,7 +898,7 @@ export const syncLeaveRequestsFromApi = async (): Promise<LeaveRequest[]> => {
   }
 
   try {
-    const rows = await apiRequest<any[]>('/leave', { method: 'GET' });
+    const rows = await apiRequest<any[]>('/leave-requests', { method: 'GET' });
     if (Array.isArray(rows)) {
       mockLeaveRequests = rows.map(mapLeaveRequestFromApi);
       saveToStorage();
@@ -923,7 +923,7 @@ export const submitLeaveRequest = (request: Omit<LeaveRequest, 'id' | 'submitted
   saveToStorage();
   eventBus.emit(EVENTS.LEAVE_UPDATED);
 
-  void apiRequest<any>('/leave', {
+  void apiRequest<any>('/leave-requests', {
     method: 'POST',
     body: JSON.stringify({
       studentId: request.studentId,
@@ -971,7 +971,7 @@ export const approveLeaveRequest = (id: string, approverComments?: string) => {
     saveToStorage();
     eventBus.emit(EVENTS.LEAVE_UPDATED);
 
-    void apiRequest<any>(`/leave/${id}/approve`, {
+    void apiRequest<any>(`/leave-requests/${id}/approve`, {
       method: 'PATCH',
       body: JSON.stringify({ approverComments }),
     })
@@ -1001,7 +1001,7 @@ export const rejectLeaveRequest = (id: string, approverComments?: string) => {
     saveToStorage();
     eventBus.emit(EVENTS.LEAVE_UPDATED);
 
-    void apiRequest<any>(`/leave/${id}/reject`, {
+    void apiRequest<any>(`/leave-requests/${id}/reject`, {
       method: 'PATCH',
       body: JSON.stringify({ approverComments }),
     })
@@ -1033,7 +1033,7 @@ export const recordParentCall = (leaveRequestId: string, calledBy: string, notes
     saveToStorage();
     eventBus.emit(EVENTS.LEAVE_UPDATED);
 
-    void apiRequest<any>(`/leave/${leaveRequestId}/verify-call`, {
+    void apiRequest<any>(`/leave-requests/${leaveRequestId}/verify-call`, {
       method: 'PATCH',
       body: JSON.stringify({ notes }),
     })

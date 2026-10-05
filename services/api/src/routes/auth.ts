@@ -100,6 +100,28 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const resolvedCollegeId = resolveCollegeId(user.college_id);
+    let profileImage = user.profile_image;
+    if (!profileImage && user.role === 'student') {
+      const { data: studentProfiles } = await db
+        .from('students')
+        .select('profile_image')
+        .eq('user_id', user.id)
+        .eq('college_id', resolvedCollegeId)
+        .limit(1);
+      profileImage = Array.isArray(studentProfiles)
+        ? studentProfiles[0]?.profile_image
+        : undefined;
+    } else if (!profileImage && ['staff', 'warden'].includes(user.role)) {
+      const { data: staffProfiles } = await db
+        .from('staff')
+        .select('profile_image')
+        .eq('user_id', user.id)
+        .eq('college_id', resolvedCollegeId)
+        .limit(1);
+      profileImage = Array.isArray(staffProfiles)
+        ? staffProfiles[0]?.profile_image
+        : undefined;
+    }
     const token = generateToken({
       userId: user.id,
       email: user.email,
@@ -117,7 +139,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         college_id: resolvedCollegeId,
         generated_id: user.generated_id,
-        profile_image: user.profile_image,
+        profile_image: profileImage,
         is_active: Boolean(user.is_active),
       },
       token,
@@ -145,6 +167,23 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
     }
 
     const user = users[0];
+    if (!user.profile_image && user.role === 'student') {
+      const { data: profiles } = await db
+        .from('students')
+        .select('profile_image')
+        .eq('user_id', user.id)
+        .eq('college_id', collegeId)
+        .limit(1);
+      user.profile_image = Array.isArray(profiles) ? profiles[0]?.profile_image : undefined;
+    } else if (!user.profile_image && ['staff', 'warden'].includes(user.role)) {
+      const { data: profiles } = await db
+        .from('staff')
+        .select('profile_image')
+        .eq('user_id', user.id)
+        .eq('college_id', collegeId)
+        .limit(1);
+      user.profile_image = Array.isArray(profiles) ? profiles[0]?.profile_image : undefined;
+    }
     res.json(user);
   } catch (error) {
     log.error('Get user error', error, { path: '/me' });

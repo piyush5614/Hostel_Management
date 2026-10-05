@@ -6,6 +6,7 @@
 import express, { Request, Response } from 'express';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
+import { authenticate } from '../middleware/auth.js';
 
 // In-memory storage for notifications
 const notificationsStore = new Map<string, any[]>();
@@ -24,6 +25,7 @@ interface Notification {
 
 export function createNotificationRoutes(io?: Server) {
   const router = express.Router();
+  router.use(authenticate);
 
   /**
    * GET /api/notifications
@@ -31,10 +33,7 @@ export function createNotificationRoutes(io?: Server) {
    */
   router.get('/', async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || (req as any).userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      const userId = req.user!.userId;
 
       const limit = parseInt(req.query.limit as string) || 50;
       const cursor = req.query.cursor as string | undefined;
@@ -69,10 +68,7 @@ export function createNotificationRoutes(io?: Server) {
    */
   router.get('/:id', async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || (req as any).userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      const userId = req.user!.userId;
 
       const userNotifications = notificationsStore.get(userId) || [];
       const notification = userNotifications.find((n) => n.id === req.params.id);
@@ -94,10 +90,7 @@ export function createNotificationRoutes(io?: Server) {
    */
   router.patch('/:id', async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || (req as any).userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      const userId = req.user!.userId;
 
       const userNotifications = notificationsStore.get(userId) || [];
       const notification = userNotifications.find((n) => n.id === req.params.id);
@@ -123,10 +116,7 @@ export function createNotificationRoutes(io?: Server) {
    */
   router.put('/read-all', async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || (req as any).userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      const userId = req.user!.userId;
 
       const userNotifications = notificationsStore.get(userId) || [];
       userNotifications.forEach((n) => {
@@ -148,10 +138,7 @@ export function createNotificationRoutes(io?: Server) {
    */
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || (req as any).userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      const userId = req.user!.userId;
 
       let userNotifications = notificationsStore.get(userId) || [];
       userNotifications = userNotifications.filter((n) => n.id !== req.params.id);

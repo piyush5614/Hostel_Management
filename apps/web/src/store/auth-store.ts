@@ -68,11 +68,10 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Email/ID and password are required');
           }
 
-          // Allow email OR generated ID format (STAFF-XXXX, STU-XXXX)
+          // IDs are issued by the administrator and may use any non-empty format.
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          const idRegex = /^(STAFF|STU)-\d{4,}$/i;
-          if (!emailRegex.test(email.trim()) && !idRegex.test(email.trim())) {
-            throw new Error('Please enter a valid email address or ID (e.g. STAFF-0001)');
+          if (!emailRegex.test(email.trim()) && email.trim().length === 0) {
+            throw new Error('Please enter a valid email address or issued ID');
           }
 
           if (password.length < 4) {
