@@ -55,9 +55,9 @@ export function LoginPage() {
     return emailRegex.test(value);
   };
 
-  // Check if input is a generated ID (STAFF-XXXX or STU-XXXX)
+  // IDs are issued by the administrator and may use any non-empty format.
   const isGeneratedId = (value: string): boolean => {
-    return /^(STAFF|STU)-\d{4,}$/i.test(value.trim());
+    return value.trim().length > 0 && !validateEmail(value.trim());
   };
 
   // Handle form validation
@@ -71,9 +71,6 @@ export function LoginPage() {
     // Validate email or generated ID
     if (!email.trim()) {
       setEmailError('Email or Staff/Student ID is required');
-      isValid = false;
-    } else if (!validateEmail(email.trim()) && !isGeneratedId(email.trim())) {
-      setEmailError('Please enter a valid email or ID (e.g. STAFF-0001, STU-0001)');
       isValid = false;
     }
 
