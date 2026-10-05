@@ -7,11 +7,13 @@ import {
   Key, Search, Copy, Check, RefreshCw, Shield,
   UserCircle, Download, Clock, AlertCircle,
 } from 'lucide-react';
-import { mockCredentials, mockStaff, resetCredentialPassword, mockActivityLogs } from '../store/mock-data';
+import { mockCredentials, mockStaff, mockStudents, resetCredentialPassword, mockActivityLogs } from '../store/mock-data';
 import { GeneratedCredential } from '../types';
 import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { toast } from 'sonner';
 import { useAuthStore } from '../store/auth-store';
+import { useDataRefresh } from '../utils/use-data-refresh';
+import { EVENTS } from '../utils/event-bus';
 
 export function CredentialManagementPage() {
   const user = useAuthStore(s => s.user);
@@ -19,6 +21,7 @@ export function CredentialManagementPage() {
   const [roleFilter, setRoleFilter] = useState('');
   const [copiedField, setCopiedField] = useState('');
   const [activeTab, setActiveTab] = useState<'credentials' | 'activity'>('credentials');
+  const dataRefreshKey = useDataRefresh([EVENTS.STAFF_UPDATED, EVENTS.STUDENT_UPDATED]);
 
   // Build credential list from existing staff/students + generated ones
   const allCredentials = useMemo(() => {
@@ -41,8 +44,24 @@ export function CredentialManagementPage() {
       }
     });
 
+    mockStudents.forEach(s => {
+      if (!creds.find(c => c.generatedId === s.enrollmentNumber)) {
+        creds.push({
+          id: `student-cred-${s.id}`,
+          userId: s.userId,
+          name: s.name,
+          email: s.email,
+          role: 'student',
+          generatedId: s.enrollmentNumber,
+          generatedPassword: s.generatedPassword || '••••••••',
+          createdAt: s.joiningDate,
+          isActive: s.isActive,
+        });
+      }
+    });
+
     return creds;
-  }, []);
+  }, [dataRefreshKey]);
 
   const filteredCredentials = useMemo(() => {
     let result = [...allCredentials];

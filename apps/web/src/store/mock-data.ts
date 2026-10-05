@@ -548,7 +548,8 @@ export const syncStudentsFromApi = async (): Promise<Student[]> => {
   }
 
   try {
-    const rows = await apiRequest<any[]>('/students', { method: 'GET' });
+    const response = await apiRequest<any>('/students', { method: 'GET' });
+    const rows = Array.isArray(response) ? response : response?.data;
     if (Array.isArray(rows)) {
       mockStudents = rows.map(mapStudentFromApi);
       saveToStorage();

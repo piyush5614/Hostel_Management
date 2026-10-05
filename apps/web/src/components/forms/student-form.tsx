@@ -100,7 +100,7 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         });
         const oneTimePassword = accountPassword;
         setAccountPassword('');
-        void syncStudentsFromApi();
+        await syncStudentsFromApi();
         setGeneratedCreds({
           id: created.id,
           password: oneTimePassword,

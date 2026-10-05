@@ -85,7 +85,7 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
         });
         const oneTimePassword = accountPassword;
         setAccountPassword('');
-        void syncStaffFromApi();
+        await syncStaffFromApi();
         setGeneratedCreds({
           id: created.id,
           password: oneTimePassword,
