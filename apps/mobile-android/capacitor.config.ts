@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.tchostel.connect',
-  appName: 'TC Hostel Connect',
+  appName: 'Hostel Connect',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

@@ -19,7 +19,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       <div className="fixed left-0 top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border bg-background px-4 md:hidden">
         <Link to="/dashboard" className="flex items-center">
           <School className="h-8 w-8 text-primary-600" />
-          <span className="ml-2 text-xl font-bold">TC Hostel Connect</span>
+          <span className="ml-2 text-xl font-bold">Hostel Connect</span>
         </Link>
         <Button
           variant="ghost"
@@ -41,7 +41,7 @@ export function Sidebar({ userRole }: SidebarProps) {
         <div className="flex h-16 items-center border-b border-border px-6">
           <Link to="/dashboard" className="flex items-center">
             <School className="h-8 w-8 text-primary-600" />
-            <span className="ml-2 text-xl font-bold">TC Hostel Connect</span>
+            <span className="ml-2 text-xl font-bold">Hostel Connect</span>
           </Link>
         </div>
         <div className="flex flex-1 flex-col overflow-y-auto p-4">
@@ -68,7 +68,7 @@ export function Sidebar({ userRole }: SidebarProps) {
         <div className="flex h-16 items-center justify-between border-b border-border px-6">
           <Link to="/dashboard" className="flex items-center">
             <School className="h-8 w-8 text-primary-600" />
-            <span className="ml-2 text-xl font-bold">TC Hostel Connect</span>
+            <span className="ml-2 text-xl font-bold">Hostel Connect</span>
           </Link>
           <Button
             variant="ghost"

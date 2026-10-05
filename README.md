@@ -1,4 +1,4 @@
-# TC Hostel Connect — Monorepo Architecture
+# Hostel Connect — Monorepo Architecture
 
 A modern, full-stack, enterprise-grade Hostel Management Platform built as a scalable Monorepo utilizing **npm Workspaces**, **Turborepo**, **React 18 + Vite**, **Express.js**, and **Capacitor Mobile**.
 

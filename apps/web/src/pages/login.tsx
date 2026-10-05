@@ -172,7 +172,7 @@ export function LoginPage() {
           
           <CardHeader className="relative p-0 pt-6 text-center">
             <CardTitle className="text-3xl font-bold text-white mb-2 animate-gradient">
-              TC Hostel Connect
+              Hostel Connect
             </CardTitle>
             <CardDescription className="text-primary-100 text-lg font-medium">
               Modern Hostel Management System

@@ -137,7 +137,7 @@ export const exportService = {
 </head>
 <body>
   <div class="header">
-    <h1>${title || 'TC Hostel Connect Report'}</h1>
+    <h1>${title || 'Hostel Connect Report'}</h1>
     <p>Generated on ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
   </div>
   <div class="no-print" style="text-align:center;margin-bottom:16px;">
@@ -157,7 +157,7 @@ export const exportService = {
     </tbody>
   </table>
   <div class="footer">
-    <p>TC Hostel Connect &bull; Total Records: ${data.length} &bull; ${new Date().toLocaleDateString()}</p>
+    <p>Hostel Connect &bull; Total Records: ${data.length} &bull; ${new Date().toLocaleDateString()}</p>
   </div>
 </body>
 </html>`;

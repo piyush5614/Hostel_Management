@@ -523,7 +523,7 @@ export const mockSMSNotifications: SMSNotification[] = [
     studentId: '4',
     parentContact: '9876543220',
     leaveRequestId: '1',
-    messageContent: 'TC Hostel: Your child Sneha Reddy has applied for medical leave from 20-Dec to 25-Dec. Reason: Medical checkup. Approve: Reply YES-TC001 or visit: https://tchostel.edu/approve/TC001',
+    messageContent: 'Hostel Connect: Your child Sneha Reddy has applied for medical leave from 20-Dec to 25-Dec. Reason: Medical checkup. Approve: Reply YES-TC001 or visit: https://tchostel.edu/approve/TC001',
     sentAt: '2024-12-18T10:31:00Z',
     deliveryStatus: 'delivered',
     approvalLink: 'https://tchostel.edu/approve/TC001',
@@ -536,7 +536,7 @@ export const mockSMSNotifications: SMSNotification[] = [
     studentId: '1',
     parentContact: '9876543211',
     leaveRequestId: '2',
-    messageContent: 'TC Hostel: Your child Arjun Sharma has applied for home leave from 22-Dec to 26-Dec. Reason: Family function. Approve: Reply YES-TC002 or visit: https://tchostel.edu/approve/TC002',
+    messageContent: 'Hostel Connect: Your child Arjun Sharma has applied for home leave from 22-Dec to 26-Dec. Reason: Family function. Approve: Reply YES-TC002 or visit: https://tchostel.edu/approve/TC002',
     sentAt: '2024-12-19T16:46:00Z',
     deliveryStatus: 'delivered',
     approvalLink: 'https://tchostel.edu/approve/TC002',
@@ -670,7 +670,7 @@ export const sendLeaveApprovalSMS = async (studentId: string, leaveRequestId: st
   const approvalCode = `TC${Date.now().toString().slice(-3)}`;
   const approvalLink = `https://tchostel.edu/approve/${approvalCode}`;
   
-  const smsContent = `TC Hostel: Your child ${student.name} has applied for ${leaveRequestId} leave. Approve: Reply YES-${approvalCode} or visit: ${approvalLink}`;
+  const smsContent = `Hostel Connect: Your child ${student.name} has applied for ${leaveRequestId} leave. Approve: Reply YES-${approvalCode} or visit: ${approvalLink}`;
   
   const notification: SMSNotification = {
     id: `sms-${Date.now()}`,

@@ -385,10 +385,10 @@ Shows the project at a glance with:
 
 ### Via Email
 ```
-Subject: TC Hostel Connect - Project Analysis & Market Readiness Report
+Subject: Hostel Connect - Project Analysis & Market Readiness Report
 
 Body:
-Please find attached the comprehensive project analysis for TC Hostel Connect.
+Please find attached the comprehensive project analysis for Hostel Connect.
 
 Key Highlights:
 ✅ Market Readiness Score: 8.3/10

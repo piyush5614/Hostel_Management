@@ -24,7 +24,7 @@ export function AppLayout({ user, onLogout }: AppLayoutProps) {
     );
 
     if (current) return current.title;
-    return 'TC Hostel Connect';
+    return 'Hostel Connect';
   }, [location.pathname, userRole]);
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export function AppLayout({ user, onLogout }: AppLayoutProps) {
         <div className="flex h-14 items-center justify-between border-b border-border px-4">
           <Link to="/dashboard" className="flex items-center gap-2 font-semibold" onClick={() => setIsMenuOpen(false)}>
             <School className="h-5 w-5 text-primary-600" />
-            <span className="truncate">TC Hostel Connect</span>
+            <span className="truncate">Hostel Connect</span>
           </Link>
 
           <Button

@@ -1,4 +1,4 @@
-# TC Hostel Connect: Project Briefing
+# Hostel Connect: Project Briefing
 
 **Audience:** Management  
 **Review date:** 28 September 2026  
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-TC Hostel Connect is a web-based hostel operations platform intended to bring student, staff, warden, and administrator workflows into one system. Its feature areas include student and room records, leave approvals, attendance, visitor logs, maintenance, staff tasks, messages, notifications, and reports. The repository also contains a company-level control-center service and an Android wrapper.
+Hostel Connect is a web-based hostel operations platform intended to bring student, staff, warden, and administrator workflows into one system. Its feature areas include student and room records, leave approvals, attendance, visitor logs, maintenance, staff tasks, messages, notifications, and reports. The repository also contains a company-level control-center service and an Android wrapper.
 
 The project has a substantial implementation and a working technical foundation. In this review, the frontend production build succeeded, the API type-check succeeded, and all 100 tests in the backend route-test suite passed. These results show that key code paths build and that tested API behavior works under the test setup; they do **not** prove the deployed system, all screens, real institution data, security controls, or operational processes are production-ready.
 

@@ -7,11 +7,11 @@ export const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'TC Hostel Connect API',
+      title: 'Hostel Connect API',
       description: 'REST API for hostel management system with multi-college support',
       version: '1.0.0',
       contact: {
-        name: 'TC Hostel Connect Support',
+        name: 'Hostel Connect Support',
         url: 'https://github.com',
       },
       license: {

@@ -135,7 +135,7 @@ export function ParentApprovalPage() {
               <School className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">TC Hostel Connect</h1>
+              <h1 className="text-2xl font-bold">Hostel Connect</h1>
               <p className="text-primary-100">Parent Leave Approval</p>
             </div>
           </div>

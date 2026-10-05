@@ -81,7 +81,7 @@ export async function sendTaskAssignmentEmail(payload: TaskEmailPayload): Promis
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#1E40AF,#3B82F6);padding:28px 32px;">
-              <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">🏢 TC Hostel Connect</h1>
+              <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">🏢 Hostel Connect</h1>
               <p style="margin:6px 0 0;color:#BFDBFE;font-size:13px;">Staff Task Management System</p>
             </td>
           </tr>
@@ -147,7 +147,7 @@ export async function sendTaskAssignmentEmail(payload: TaskEmailPayload): Promis
           <tr>
             <td style="background:#F9FAFB;border-top:1px solid #E5E7EB;padding:20px 32px;">
               <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center;">
-                This is an automated notification from TC Hostel Connect.<br/>
+                This is an automated notification from Hostel Connect.<br/>
                 Please do not reply to this email.
               </p>
             </td>
@@ -161,7 +161,7 @@ export async function sendTaskAssignmentEmail(payload: TaskEmailPayload): Promis
 </html>`;
 
   await transporter.sendMail({
-    from: `"TC Hostel Connect" <${process.env.GMAIL_USER}>`,
+    from: `"Hostel Connect" <${process.env.GMAIL_USER}>`,
     to: staffEmail,
     subject: `📋 New Task Assigned: ${taskTitle}`,
     html: htmlBody,

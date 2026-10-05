@@ -1,6 +1,6 @@
-# Deployment Guide - TC Hostel Connect
+# Deployment Guide - Hostel Connect
 
-This guide provides instructions for deploying the TC Hostel Connect application in development and production environments.
+This guide provides instructions for deploying the Hostel Connect application in development and production environments.
 
 ## Table of Contents
 
@@ -203,7 +203,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGc...your-anon-key...
 1. Go to https://supabase.com
 2. Sign in or create account
 3. Create new project
-   - Name: `TC Hostel Connect` (or your choice)
+   - Name: `Hostel Connect` (or your choice)
    - Choose region closest to your users
    - Set strong database password
 4. Wait for project to initialize (~2 minutes)

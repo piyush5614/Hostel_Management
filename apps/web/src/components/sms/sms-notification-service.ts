@@ -32,7 +32,7 @@ export class SMSNotificationService {
       const endDate = new Date(leaveRequest.endDate).toLocaleDateString('en-IN');
       
       // Create SMS content
-      const smsContent = `🏫 TC Hostel Alert
+      const smsContent = `🏫 Hostel Connect Alert
 Student: ${student.name}
 Leave Request: ${startDate} to ${endDate}
 Reason: ${leaveRequest.reason}
@@ -41,7 +41,7 @@ To APPROVE: Reply "YES ${approvalCode}"
 To REJECT: Reply "NO ${approvalCode}"
 Or click: ${approvalLink}
 
-TC Hostel Management`;
+Hostel Connect Management`;
 
       // In production, this would call actual SMS API
       // For demo, we'll simulate the SMS sending

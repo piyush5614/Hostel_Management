@@ -1,5 +1,5 @@
 # Performance Optimization Implementation Guide
-# TC Hostel Connect - Response Time Fixes
+# Hostel Connect - Response Time Fixes
 
 ## 🎯 Quick Wins (Priority Order)
 
