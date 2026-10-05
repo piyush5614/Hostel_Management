@@ -63,7 +63,7 @@ export function VisitorManagementPage() {
     return {
       today: todayVisitors.length,
       active: activeVisitors.length,
-      total: totalVisitors,
+      total: visitors.length,
       averageStay: Number(averageStay.toFixed(1))
     };
   };
