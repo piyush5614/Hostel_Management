@@ -99,7 +99,9 @@ Authorization: Bearer <administrator JWT>
 Content-Type: application/json
 ```
 
-Both endpoints accept `email`, `password`, `name`, `generatedId`, and a `profile` object. Student profiles require `course`, `year`, `gender`, `date_of_birth`, `contact_number`, `address`, `guardian_name`, `guardian_contact`, and `emergency_contact`. Staff profiles require `position`, `department`, `contact_number`, and `address`. Passwords must be at least eight characters. A successful response is `201` and contains `userId`, `id`, `email`, `role`, `college_id`, and `profile`; it never contains the password. Duplicate IDs return `409`, invalid profile data returns `400`, and non-admin callers receive `403`.
+Both endpoints accept `password`, `name`, `generatedId`, and a `profile` object. An email may be supplied for contact purposes, but it is optional: Staff and Student log in with the generated ID and the password entered by the Admin. Student profiles require `course`, `year`, `gender`, `date_of_birth`, `contact_number`, `address`, `guardian_name`, `guardian_contact`, and `emergency_contact`. Staff profiles require `position`, `department`, `contact_number`, and `address`. Passwords must be at least eight characters. A successful response is `201` and contains `userId`, `id`, `email`, `role`, `college_id`, and `profile`; it never contains the password. Duplicate IDs return `409`, invalid profile data returns `400`, and non-admin callers receive `403`.
+
+Only the Admin is created in Supabase Auth. Staff and Student credentials are stored as bcrypt hashes in the application database and are linked to their generated ID and profile in one database transaction. Apply all files in `services/api/database/migrations/` to the Supabase project before using the Admin forms, including `20261005210000_local_managed_credentials.sql`.
 
 The administrator UI displays the password entered for a newly provisioned account once so it can be shared with the student or staff member. It is cleared from the form state after provisioning and is not returned by the API or persisted by the application.
 

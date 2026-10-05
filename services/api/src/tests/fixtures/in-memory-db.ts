@@ -58,9 +58,11 @@ export async function resetTestDb(): Promise<void> {
   users.length = 0;
   students.length = 0;
   leaveRequests.length = 0;
+  const studentPassword = await bcrypt.hash('TestPassword123!', 12);
   users.push(
-    { id: 'student-user', auth_id: 'student-auth', email: 'student@test.local', password: null, name: 'Test Student', role: 'student', college_id: 'college-default', is_active: true, generated_id: 'STU-0001' },
+    { id: 'student-user', auth_id: null, email: 'student@test.local', password: studentPassword, name: 'Test Student', role: 'student', college_id: 'college-default', is_active: true, generated_id: 'STU-0001' },
     { id: 'warden-user', auth_id: 'warden-auth', email: 'warden@test.local', password: null, name: 'Test Warden', role: 'warden', college_id: 'college-default', is_active: true, generated_id: 'STAFF-0001' }
   );
   students.push({ id: 'student-record', user_id: 'student-user', college_id: 'college-default' });
 }
+import bcrypt from 'bcryptjs';

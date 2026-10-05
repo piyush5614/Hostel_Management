@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 import { getDb } from '../db/init.js';
 import { generateToken } from '../utils/auth.js';
 import { authenticate, getRequestCollegeId } from '../middleware/auth.js';
@@ -52,26 +53,40 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       user = usersById && usersById.length > 0 ? usersById[0] : null;
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-    if (!user || !user.auth_id || !supabaseUrl || !publishableKey) {
+    if (!user) {
       log.warn('Login failed - invalid credentials', { email, ip: req.ip });
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
-    const authClient = createClient(supabaseUrl, publishableKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
-      email: user.email,
-      password,
-    });
+    if (user.role === 'admin') {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+      if (!user.auth_id || !supabaseUrl || !publishableKey) {
+        log.warn('Admin login is not linked to Supabase Auth', { email, ip: req.ip });
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
 
-    if (authError || authData.user?.id !== user.auth_id) {
-      log.warn('Login failed - invalid credentials', { email, ip: req.ip });
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
+      const authClient = createClient(supabaseUrl, publishableKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
+        email: user.email,
+        password,
+      });
+
+      if (authError || authData.user?.id !== user.auth_id) {
+        log.warn('Admin login failed through Supabase Auth', { email, ip: req.ip });
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+    } else {
+      if (!user.password || !(await bcrypt.compare(password, user.password))) {
+        log.warn('Managed account login failed', { email, role: user.role, ip: req.ip });
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
     }
 
     // Update last_login timestamp

@@ -170,12 +170,11 @@ export function StaffForm({ staff, onSuccess, onCancel }: StaffFormProps) {
           required
         />
         <Input
-          label="Email"
+          label="Email (optional)"
           type="email"
           value={formData.email}
           onChange={(e) => handleChange('email', e.target.value)}
           placeholder="staff@tchostel.edu"
-          required
         />
       </div>
 

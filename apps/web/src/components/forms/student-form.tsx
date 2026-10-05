@@ -254,12 +254,11 @@ export function StudentForm({ student, onSuccess, onCancel }: StudentFormProps) 
         />
 
         <Input
-          label="Email"
+          label="Email (optional)"
           type="email"
           value={formData.email}
           onChange={(e) => handleChange('email', e.target.value)}
           placeholder="student@tchostel.edu"
-          required
         />
       </div>
 
