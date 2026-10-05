@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -6,14 +6,17 @@ import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockStudents, mockStaff, updateStudent, updateStaffMember, updateUser } from '../store/mock-data';
+import { mockStudents, mockStaff, syncStaffFromApi, syncStudentsFromApi, updateStudent, updateStaffMember, updateUser } from '../store/mock-data';
 import { Student, Staff } from '../types';
 import { Edit, Camera, Save, X, Upload, Image, Star, Sparkles, User, AlertTriangle, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
+import { useDataRefresh } from '../utils/use-data-refresh';
+import { EVENTS } from '../utils/event-bus';
 
 export function ProfilePage() {
   const { t } = useTranslation();
   const { user, updateUser: updateAuthUser } = useAuthStore();
+  const profileRefreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED, EVENTS.STAFF_UPDATED]);
   const [isEditing, setIsEditing] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -30,6 +33,15 @@ export function ProfilePage() {
   const isStaffUser = user?.role === 'staff' || user?.role === 'warden' || user?.role === 'admin';
   const profileRecord = isStaffUser ? staffData : studentData;
   const displayProfileImage = user?.profileImage || profileRecord?.profileImage || null;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (user.role === 'student') {
+      void syncStudentsFromApi();
+    } else if (user.role === 'staff' || user.role === 'warden') {
+      void syncStaffFromApi();
+    }
+  }, [user?.id, user?.role]);
   
   // Unified form data — works for both students and staff
   const [formData, setFormData] = useState({
@@ -53,6 +65,30 @@ export function ProfilePage() {
     qualifications: (staffData as Staff | undefined)?.qualifications || '',
     joiningDate: profileRecord?.joiningDate || '',
   });
+
+  useEffect(() => {
+    setFormData({
+      name: profileRecord?.name || user?.name || '',
+      email: profileRecord?.email || user?.email || '',
+      enrollmentNumber: (studentData as Student | undefined)?.enrollmentNumber || '',
+      employeeId: (staffData as Staff | undefined)?.employeeId || '',
+      course: (studentData as Student | undefined)?.course || '',
+      year: (studentData as Student | undefined)?.year?.toString() || '1',
+      gender: profileRecord?.gender || 'male',
+      dateOfBirth: (profileRecord as any)?.dateOfBirth || '',
+      contactNumber: profileRecord?.contactNumber || '',
+      address: profileRecord?.address || '',
+      guardianName: (studentData as Student | undefined)?.guardianName || '',
+      guardianContact: (studentData as Student | undefined)?.guardianContact || '',
+      emergencyContact: profileRecord?.emergencyContact || '',
+      medicalNotes: profileRecord?.medicalNotes || '',
+      position: (staffData as Staff | undefined)?.position || '',
+      department: (staffData as Staff | undefined)?.department || '',
+      shiftTiming: (staffData as Staff | undefined)?.shiftTiming || '',
+      qualifications: (staffData as Staff | undefined)?.qualifications || '',
+      joiningDate: profileRecord?.joiningDate || '',
+    });
+  }, [profileRefreshKey, user?.id]);
 
   const handleSave = async () => {
     try {
