@@ -222,7 +222,7 @@ function buildPdf() {
       margin: PAGE.margin,
       bufferPages: true,
       info: {
-        Title: 'TC Hostel Connect Analysis',
+        Title: 'Hostel Connect Analysis',
         Author: 'GitHub Copilot',
         Subject: 'Project analysis and market readiness report',
       },
@@ -247,7 +247,7 @@ function buildPdf() {
     y = addSectionTitle(doc, '1. Executive Summary', y + 10);
     y = addParagraph(
       doc,
-      'TC Hostel Connect is a cloud-based hostel management system for educational institutions. The platform combines student accommodation workflows, attendance tracking, room operations, staff task handling, and reporting in a single Node.js and TypeScript application.',
+      'Hostel Connect is a cloud-based hostel management system for educational institutions. The platform combines student accommodation workflows, attendance tracking, room operations, staff task handling, and reporting in a single Node.js and TypeScript application.',
       y
     );
 
@@ -267,7 +267,7 @@ function buildPdf() {
     );
 
     y = addSectionTitle(doc, '2. Project Overview and Vision', y + 10);
-    y = addParagraph(doc, 'Project Name: TC Hostel Connect', y, { align: 'left' });
+    y = addParagraph(doc, 'Project Name: Hostel Connect', y, { align: 'left' });
     y = addParagraph(doc, 'Version: v1.0.0-MVP', y, { align: 'left' });
     y = addParagraph(doc, 'Type: Cloud-Based SaaS Platform', y, { align: 'left' });
     y = addParagraph(doc, 'Target Users: Educational Institutions, Hostels, Colleges', y, { align: 'left' });
