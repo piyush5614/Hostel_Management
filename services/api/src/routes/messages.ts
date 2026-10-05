@@ -63,6 +63,25 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
   }
 });
 
+router.get('/recipients', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const db = await getDb();
+    const collegeId = resolveCollegeId(req.user?.collegeId);
+    const { data, error } = await db
+      .from('users')
+      .select('id, name, email, role, profile_image')
+      .eq('college_id', collegeId)
+      .eq('is_active', true)
+      .neq('id', req.user?.userId);
+
+    if (error) throw error;
+    res.json({ data: data || [] });
+  } catch (error) {
+    console.error('Get message recipients error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
@@ -70,7 +89,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
     const collegeId = resolveCollegeId(user?.collegeId);
 
     const receiverId = req.body.receiverId || req.body.receiver_id;
-    const content = req.body.content;
+    const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
     const messageType = req.body.messageType || req.body.message_type || 'direct';
     const priority = req.body.priority || 'normal';
 
@@ -99,6 +118,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
         sender_id: user?.userId,
         receiver_id: receiverId,
         content,
+        subject: typeof req.body.subject === 'string' ? req.body.subject.trim() || null : null,
         is_read: false,
         message_type: messageType,
         priority,

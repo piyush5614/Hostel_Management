@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockMessages, mockStudents, mockStaff } from '../store/mock-data';
 import { Message } from '../types';
 import { 
   MessageCircle, Plus, Send, Search, Paperclip, Smile, MoreVertical, 
@@ -16,6 +15,12 @@ import { cn } from '../lib/utils';
 
 export function MessagesPage() {
   const user = useAuthStore((state) => state.user);
+  const getToken = useAuthStore((state) => state.getToken);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [recipients, setRecipients] = useState<Array<{ id: string; name: string; email: string; type: string; avatar?: string }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,19 +31,66 @@ export function MessagesPage() {
     content: '',
   });
 
-  // Get all users for recipient selection
-  const allUsers = [
-    ...mockStudents.map(s => ({ id: s.userId, name: s.name, email: s.email, type: 'student', avatar: s.profileImage })),
-    ...mockStaff.map(s => ({ id: s.userId, name: s.name, email: s.email, type: 'staff', avatar: s.profileImage })),
-  ].filter(u => u.id !== user?.id);
+  const apiRequest = useCallback(async (path: string, init?: RequestInit) => {
+    const token = getToken();
+    if (!token) throw new Error('Your session has expired. Please sign in again.');
+    const response = await fetch(`/api${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers || {}),
+      },
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'Unable to complete message request');
+    return payload;
+  }, [getToken]);
 
-  // Get user messages
-  const userMessages = mockMessages.filter(
-    msg => msg.senderId === user?.id || msg.receiverId === user?.id
-  );
+  const mapMessage = (raw: any): Message => ({
+    id: raw.id,
+    senderId: raw.senderId || raw.sender_id,
+    receiverId: raw.receiverId || raw.receiver_id,
+    content: raw.content,
+    timestamp: raw.timestamp || raw.created_at,
+    read: raw.read ?? raw.is_read ?? false,
+    subject: raw.subject || undefined,
+    attachments: raw.attachments || undefined,
+    messageType: raw.messageType || raw.message_type || 'direct',
+    priority: raw.priority || 'normal',
+  });
+
+  const loadMessages = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [messagePayload, recipientPayload] = await Promise.all([
+        apiRequest('/messages?limit=200'),
+        apiRequest('/messages/recipients'),
+      ]);
+      setMessages((messagePayload?.data || []).map(mapMessage));
+      setRecipients((recipientPayload?.data || []).map((recipient: any) => ({
+        id: recipient.id,
+        name: recipient.name,
+        email: recipient.email,
+        type: recipient.role,
+        avatar: recipient.profile_image,
+      })));
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : 'Unable to load messages';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiRequest]);
+
+  useEffect(() => {
+    if (user) void loadMessages();
+  }, [user, loadMessages]);
 
   // Group messages by conversation
-  const conversations = userMessages.reduce((acc, message) => {
+  const conversations = messages.reduce((acc, message) => {
     const otherUserId = message.senderId === user?.id ? message.receiverId : message.senderId;
     if (!acc[otherUserId]) {
       acc[otherUserId] = [];
@@ -55,59 +107,60 @@ export function MessagesPage() {
   });
 
   const getUserInfo = (userId: string) => {
-    const student = mockStudents.find(s => s.userId === userId);
-    if (student) return { name: student.name, email: student.email, type: 'student', avatar: student.profileImage };
-    
-    const staff = mockStaff.find(s => s.userId === userId);
-    if (staff) return { name: staff.name, email: staff.email, type: 'staff', avatar: staff.profileImage };
-    
-    return { name: 'Unknown User', email: '', type: 'unknown', avatar: null };
+    return recipients.find(recipient => recipient.id === userId) || { name: 'Unknown User', email: '', type: 'unknown', avatar: undefined };
   };
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation) return;
-
-    const message: Message = {
-      id: Date.now().toString(),
-      senderId: user?.id || '',
-      receiverId: selectedConversation,
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      read: false,
-      messageType: 'direct',
-      priority: 'normal'
-    };
-
-    mockMessages.push(message);
-    setNewMessage('');
-    toast.success('Message sent! ✨');
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation || isSending) return;
+    setIsSending(true);
+    try {
+      const created = await apiRequest('/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          receiverId: selectedConversation,
+          content: newMessage.trim(),
+          messageType: 'direct',
+          priority: 'normal',
+        }),
+      });
+      setMessages(current => [...current, mapMessage(created)]);
+      setNewMessage('');
+      toast.success('Message sent! ✨');
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'Unable to send message');
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleComposeSubmit = (e: React.FormEvent) => {
+  const handleComposeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const message: Message = {
-      id: Date.now().toString(),
-      senderId: user?.id || '',
-      receiverId: composeData.receiverId,
-      content: composeData.content,
-      subject: composeData.subject,
-      timestamp: new Date().toISOString(),
-      read: false,
-      messageType: 'direct',
-      priority: 'normal'
-    };
-
-    mockMessages.push(message);
-    setIsComposeModalOpen(false);
-    setComposeData({ receiverId: '', subject: '', content: '' });
-    toast.success('Message sent successfully! 🚀');
+    if (!composeData.receiverId || !composeData.content.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      const created = await apiRequest('/messages', {
+        method: 'POST',
+        body: JSON.stringify({ ...composeData, content: composeData.content.trim() }),
+      });
+      setMessages(current => [...current, mapMessage(created)]);
+      setIsComposeModalOpen(false);
+      setComposeData({ receiverId: '', subject: '', content: '' });
+      toast.success('Message sent successfully! 🚀');
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'Unable to send message');
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const markAsRead = (messageId: string) => {
-    const message = mockMessages.find(m => m.id === messageId);
-    if (message && message.receiverId === user?.id) {
-      message.read = true;
+  const markAsRead = async (messageId: string) => {
+    const message = messages.find(item => item.id === messageId);
+    if (!message || message.receiverId !== user?.id || message.read) return;
+    try {
+      const updated = await apiRequest(`/messages/${messageId}/read`, { method: 'PATCH' });
+      setMessages(current => current.map(item => item.id === messageId ? mapMessage(updated) : item));
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'Unable to mark message as read');
     }
   };
 
@@ -187,6 +240,8 @@ export function MessagesPage() {
             </CardHeader>
             <CardContent className="flex-1 overflow-y-auto p-0">
               <div className="space-y-2 p-3">
+                {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading messages...</p>}
+                {!isLoading && error && <p className="p-4 text-sm text-destructive">{error}</p>}
                 {sortedConversations.map(([userId, messages]) => {
                   const userInfo = getUserInfo(userId);
                   const latestMessage = getLatestMessage(messages);
@@ -536,9 +591,9 @@ export function MessagesPage() {
               required
             >
               <option value="">Select recipient</option>
-              {allUsers.map(user => (
-                <option key={user.id} value={user.id}>
-                  {user.name} ({user.type})
+              {recipients.map(recipient => (
+                <option key={recipient.id} value={recipient.id}>
+                  {recipient.name} ({recipient.type})
                 </option>
               ))}
             </select>

@@ -11,7 +11,16 @@ class QueryBuilder implements PromiseLike<{ data: Row[] | Row | null; error: any
   insert(values: Row | Row[]): this { this.operation = 'insert'; this.values = Array.isArray(values) ? values : [values]; return this; }
   update(values: Row): this { this.operation = 'update'; this.values = [values]; return this; }
   eq(field: string, value: any): this { this.filters.push((row) => row[field] === value); return this; }
+  neq(field: string, value: any): this { this.filters.push((row) => row[field] !== value); return this; }
   gt(field: string, value: any): this { this.filters.push((row) => row[field] > value); return this; }
+  or(expression: string): this {
+    const filters = expression.split(',').map((part) => {
+      const match = part.match(/(?:and\()?([a-z_]+)\.eq\.([^),]+)\)?/);
+      return match ? { field: match[1], value: match[2] } : null;
+    }).filter(Boolean) as Array<{ field: string; value: string }>;
+    if (filters.length) this.filters.push((row) => filters.some(filter => String(row[filter.field]) === filter.value));
+    return this;
+  }
   order(): this { return this; }
   limit(): this { return this; }
 
@@ -46,10 +55,11 @@ class QueryBuilder implements PromiseLike<{ data: Row[] | Row | null; error: any
 export const users: Row[] = [];
 export const students: Row[] = [];
 export const leaveRequests: Row[] = [];
+export const messages: Row[] = [];
 
 export const testDb = {
   from(tableName: string): QueryBuilder {
-    const table = tableName === 'users' ? users : tableName === 'students' ? students : leaveRequests;
+    const table = tableName === 'users' ? users : tableName === 'students' ? students : tableName === 'messages' ? messages : leaveRequests;
     return new QueryBuilder(table);
   },
 };
@@ -58,10 +68,12 @@ export async function resetTestDb(): Promise<void> {
   users.length = 0;
   students.length = 0;
   leaveRequests.length = 0;
+  messages.length = 0;
   const studentPassword = await bcrypt.hash('TestPassword123!', 12);
+  const wardenPassword = await bcrypt.hash('WardenPass123!', 12);
   users.push(
     { id: 'student-user', auth_id: null, email: 'student@test.local', password: studentPassword, name: 'Test Student', role: 'student', college_id: 'college-default', is_active: true, generated_id: 'STU-0001' },
-    { id: 'warden-user', auth_id: 'warden-auth', email: 'warden@test.local', password: null, name: 'Test Warden', role: 'warden', college_id: 'college-default', is_active: true, generated_id: 'STAFF-0001' }
+    { id: 'warden-user', auth_id: 'warden-auth', email: 'warden@test.local', password: wardenPassword, name: 'Test Warden', role: 'warden', college_id: 'college-default', is_active: true, generated_id: 'STAFF-0001' }
   );
   students.push({ id: 'student-record', user_id: 'student-user', college_id: 'college-default' });
 }
