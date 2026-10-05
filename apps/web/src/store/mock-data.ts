@@ -892,6 +892,104 @@ const upsertLeaveRequest = (request: LeaveRequest): LeaveRequest => {
   return request;
 };
 
+const mapMaintenanceRequestFromApi = (row: any): MaintenanceRequest => ({
+  id: row.id,
+  requesterId: row.requester_id ?? row.requesterId,
+  requesterType: row.requester_type ?? row.requesterType,
+  roomId: row.room_id ?? row.roomId,
+  title: row.title,
+  description: row.description ?? '',
+  priority: row.priority ?? 'medium',
+  status: row.status,
+  category: row.category ?? 'other',
+  createdAt: row.created_at ?? row.createdAt,
+  assignedTo: row.assigned_to ?? row.assignedTo,
+  completedAt: row.completed_at ?? row.completedAt,
+  estimatedCost: row.estimated_cost ?? row.estimatedCost,
+  actualCost: row.actual_cost ?? row.actualCost,
+  remarks: row.remarks,
+  images: row.images,
+});
+
+const replaceMaintenanceRequests = (requests: MaintenanceRequest[]) => {
+  mockMaintenanceRequests.splice(0, mockMaintenanceRequests.length, ...requests);
+  saveToStorage();
+  eventBus.emit(EVENTS.MAINTENANCE_UPDATED);
+};
+
+export const syncMaintenanceRequestsFromApi = async (filters?: {
+  status?: MaintenanceRequest['status'];
+  priority?: MaintenanceRequest['priority'];
+}): Promise<MaintenanceRequest[]> => {
+  if (!getApiToken()) {
+    return mockMaintenanceRequests;
+  }
+
+  try {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.priority) params.set('priority', filters.priority);
+    const query = params.toString();
+    const response = await apiRequest<any>(`/maintenance${query ? `?${query}` : ''}`, { method: 'GET' });
+    const rows = Array.isArray(response) ? response : response?.data;
+    if (!Array.isArray(rows)) {
+      throw new Error('Maintenance API returned an invalid response');
+    }
+    const requests = rows.map(mapMaintenanceRequestFromApi);
+    replaceMaintenanceRequests(requests);
+  } catch (error) {
+    console.error('Failed to sync maintenance requests from API:', error);
+    replaceMaintenanceRequests([]);
+  }
+
+  return mockMaintenanceRequests;
+};
+
+export const createMaintenanceRequest = async (
+  request: Pick<MaintenanceRequest, 'title' | 'description' | 'category' | 'priority'> & { roomId?: string }
+): Promise<MaintenanceRequest> => {
+  const created = await apiRequest<any>('/maintenance', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: request.title,
+      description: request.description,
+      category: request.category,
+      priority: request.priority,
+      roomId: request.roomId || null,
+    }),
+  });
+  const mapped = mapMaintenanceRequestFromApi(created);
+  const existingIndex = mockMaintenanceRequests.findIndex((item) => item.id === mapped.id);
+  if (existingIndex >= 0) {
+    mockMaintenanceRequests[existingIndex] = mapped;
+  } else {
+    mockMaintenanceRequests.unshift(mapped);
+  }
+  saveToStorage();
+  eventBus.emit(EVENTS.MAINTENANCE_UPDATED);
+  return mapped;
+};
+
+export const updateMaintenanceRequest = async (
+  requestId: string,
+  updates: Partial<Pick<MaintenanceRequest, 'status' | 'priority' | 'title' | 'description' | 'category' | 'assignedTo' | 'completedAt' | 'remarks'>>
+): Promise<MaintenanceRequest> => {
+  const updated = await apiRequest<any>(`/maintenance/${requestId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  const mapped = mapMaintenanceRequestFromApi(updated);
+  const existingIndex = mockMaintenanceRequests.findIndex((item) => item.id === mapped.id);
+  if (existingIndex >= 0) {
+    mockMaintenanceRequests[existingIndex] = mapped;
+  } else {
+    mockMaintenanceRequests.unshift(mapped);
+  }
+  saveToStorage();
+  eventBus.emit(EVENTS.MAINTENANCE_UPDATED);
+  return mapped;
+};
+
 export const syncLeaveRequestsFromApi = async (): Promise<LeaveRequest[]> => {
   if (!getApiToken()) {
     return mockLeaveRequests;

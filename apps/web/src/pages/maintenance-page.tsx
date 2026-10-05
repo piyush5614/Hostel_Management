@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockMaintenanceRequests, mockRooms } from '../store/mock-data';
+import {
+  createMaintenanceRequest,
+  mockMaintenanceRequests,
+  mockRooms,
+  syncMaintenanceRequestsFromApi,
+  updateMaintenanceRequest,
+} from '../store/mock-data';
 import { exportService } from '../services/export';
 import { MaintenanceRequest } from '../types';
 import { Wrench, Plus, Download, AlertTriangle, Clock, CheckCircle, XCircle, FileSpreadsheet, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
+import { eventBus, EVENTS } from '../utils/event-bus';
 
 export function MaintenancePage() {
   const user = useAuthStore((state) => state.user);
@@ -18,6 +25,7 @@ export function MaintenancePage() {
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [, setDataVersion] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -28,9 +36,22 @@ export function MaintenancePage() {
 
   const isAdminOrWarden = user?.role === 'admin' || user?.role === 'warden';
   const canCreateRequest = user?.role === 'student' || user?.role === 'staff';
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    void syncMaintenanceRequestsFromApi();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const handleMaintenanceUpdate = () => setDataVersion((version) => version + 1);
+    return eventBus.on(EVENTS.MAINTENANCE_UPDATED, handleMaintenanceUpdate);
+  }, []);
   
   // Admin/Warden see all requests; students/staff see only their own
-  const visibleRequests = isAdminOrWarden 
+  const visibleRequests = isAdminOrWarden
     ? mockMaintenanceRequests 
     : mockMaintenanceRequests.filter(req => req.requesterId === user?.id);
 
@@ -67,36 +88,31 @@ export function MaintenancePage() {
     
     if (!user?.id) return;
 
-    const newRequest: MaintenanceRequest = {
-      id: Date.now().toString(),
-      requesterId: user.id,
-      requesterType: user.role === 'student' ? 'student' : 'staff',
-      ...formData,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-
-    mockMaintenanceRequests.push(newRequest);
-    toast.success('Maintenance request submitted successfully!');
-    setIsCreateModalOpen(false);
-    setFormData({
-      title: '',
-      description: '',
-      category: 'electrical',
-      priority: 'medium',
-      roomId: '',
-    });
+    try {
+      await createMaintenanceRequest(formData);
+      toast.success('Maintenance request submitted successfully!');
+      setIsCreateModalOpen(false);
+      setFormData({
+        title: '',
+        description: '',
+        category: 'electrical',
+        priority: 'medium',
+        roomId: '',
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to submit maintenance request');
+    }
   };
 
-  const handleStatusUpdate = (requestId: string, newStatus: MaintenanceRequest['status']) => {
-    const requestIndex = mockMaintenanceRequests.findIndex(req => req.id === requestId);
-    if (requestIndex !== -1) {
-      mockMaintenanceRequests[requestIndex] = {
-        ...mockMaintenanceRequests[requestIndex],
+  const handleStatusUpdate = async (requestId: string, newStatus: MaintenanceRequest['status']) => {
+    try {
+      await updateMaintenanceRequest(requestId, {
         status: newStatus,
-        ...(newStatus === 'completed' && { completedAt: new Date().toISOString() })
-      };
+        ...(newStatus === 'completed' ? { completedAt: new Date().toISOString() } : {}),
+      });
       toast.success(`Request marked as ${newStatus}!`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update maintenance request');
     }
   };
 
