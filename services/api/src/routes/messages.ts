@@ -26,7 +26,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     let query = db
       .from('messages')
-      .select('*, users!sender_id(id, name), users!receiver_id(id, name)')
+      .select('*, sender:users!sender_id(id, name), receiver:users!receiver_id(id, name)')
       .eq('college_id', collegeId)
       .or(`sender_id.eq.${user?.userId},receiver_id.eq.${user?.userId}`)
       .order('id', { ascending: true }); // Stable cursor

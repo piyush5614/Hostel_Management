@@ -5,7 +5,10 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { resolveCollegeId } from '../utils/tenant.js';
 
 const router = Router();
-const EVENT_FIELDS = 'id,college_id,title,description,event_date,end_date,location,created_by,created_at,updated_at,category,visibility,max_participants,registration_required,registration_deadline,status,users(name)';
+// Keep reads compatible with the currently deployed base events schema. Optional
+// event metadata is supplied by the frontend mapper when the extension migration
+// has not yet been applied.
+const EVENT_FIELDS = 'id,college_id,title,description,event_date,location,created_by,created_at,updated_at';
 
 router.get('/', authenticate, async (req: Request, res: Response) => {
   try {
@@ -15,7 +18,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
     if (error) throw error;
     const ids = (events || []).map((event: any) => event.id);
     const { data: registrations, error: registrationError } = ids.length
-      ? await db.from('event_registrations').select('id,event_id,user_id,registered_at,attended').eq('college_id', collegeId).in('event_id', ids)
+      ? await db.from('event_registrations').select('id,event_id,user_id,registered_at').eq('college_id', collegeId).in('event_id', ids)
       : { data: [], error: null };
     if (registrationError) throw registrationError;
     res.json({ events: events || [], registrations: registrations || [] });
@@ -33,7 +36,7 @@ router.post('/', authenticate, authorize('admin', 'warden'), async (req: Request
     const eventDate = req.body.startDate || req.body.eventDate;
     if (!title || !eventDate) return void res.status(400).json({ error: 'title and startDate are required' });
     const id = uuidv4();
-    const { error } = await db.from('events').insert([{ id, college_id: collegeId, title, description: req.body.description || null, event_date: eventDate, end_date: req.body.endDate || eventDate, location: req.body.location || null, created_by: req.user?.userId, category: req.body.category || 'academic', visibility: req.body.visibility || 'public', max_participants: req.body.maxParticipants ?? null, registration_required: Boolean(req.body.registrationRequired), registration_deadline: req.body.registrationDeadline || null, status: req.body.status || 'published' }]);
+    const { error } = await db.from('events').insert([{ id, college_id: collegeId, title, description: req.body.description || null, event_date: eventDate, location: req.body.location || null, created_by: req.user?.userId }]);
     if (error) throw error;
     const { data, error: fetchError } = await db.from('events').select(EVENT_FIELDS).eq('id', id).single();
     if (fetchError) throw fetchError;
@@ -49,7 +52,7 @@ router.patch('/:id', authenticate, authorize('admin', 'warden'), async (req: Req
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-    const fields: Record<string, string> = { title: 'title', description: 'description', startDate: 'event_date', endDate: 'end_date', location: 'location', category: 'category', visibility: 'visibility', maxParticipants: 'max_participants', registrationRequired: 'registration_required', registrationDeadline: 'registration_deadline', status: 'status' };
+    const fields: Record<string, string> = { title: 'title', description: 'description', startDate: 'event_date', location: 'location' };
     for (const [input, column] of Object.entries(fields)) if (req.body[input] !== undefined) updates[column] = req.body[input];
     const { error } = await db.from('events').update(updates).eq('id', req.params.id).eq('college_id', collegeId);
     if (error) throw error;
@@ -78,15 +81,9 @@ router.post('/:id/registrations', authenticate, async (req: Request, res: Respon
   try {
     const db = await getDb();
     const collegeId = resolveCollegeId(req.user?.collegeId);
-    const { data: event } = await db.from('events').select('id,registration_required,max_participants').eq('id', req.params.id).eq('college_id', collegeId).single();
+    const { data: event } = await db.from('events').select('id').eq('id', req.params.id).eq('college_id', collegeId).single();
     if (!event) return void res.status(404).json({ error: 'Event not found' });
-    if (!event.registration_required) return void res.status(400).json({ error: 'Registration is not required for this event' });
-    if (event.max_participants) {
-      const { count, error: countError } = await db.from('event_registrations').select('id', { count: 'exact', head: true }).eq('event_id', req.params.id).eq('college_id', collegeId);
-      if (countError) throw countError;
-      if ((count || 0) >= event.max_participants) return void res.status(409).json({ error: 'This event is full' });
-    }
-    const { data, error } = await db.from('event_registrations').insert([{ id: uuidv4(), college_id: collegeId, event_id: req.params.id, user_id: req.user?.userId }]).select('id,event_id,user_id,registered_at,attended').single();
+    const { data, error } = await db.from('event_registrations').insert([{ id: uuidv4(), college_id: collegeId, event_id: req.params.id, user_id: req.user?.userId }]).select('id,event_id,user_id,registered_at').single();
     if (error) return void res.status(error.code === '23505' ? 409 : 500).json({ error: error.code === '23505' ? 'Already registered' : 'Unable to register for event' });
     res.status(201).json(data);
   } catch (error) {
