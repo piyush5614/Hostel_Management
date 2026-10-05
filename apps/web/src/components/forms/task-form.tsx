@@ -3,8 +3,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { StaffTask } from '../../types';
-import { createStaffTask, updateStaffTask } from '../../store/mock-data';
-import { mockStaff } from '../../store/mock-data';
+import { createStaffTask, updateStaffTaskApi, getStaffMembers } from '../../services/staff-tasks';
 import { toast } from 'sonner';
 import { Mic, Square, Trash2, Play, Pause } from 'lucide-react';
 import { useAuthStore } from '../../store/auth-store';
@@ -18,7 +17,13 @@ interface TaskFormProps {
 
 export function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
   const user = useAuthStore(s => s.user);
-  const activeStaffList = mockStaff.filter(s => s.isActive);
+  const [activeStaffList, setActiveStaffList] = useState<any[]>([]);
+  useEffect(() => {
+    getStaffMembers().then(staff => {
+      setActiveStaffList(staff);
+      if (!formData.assignedTo && staff[0]) setFormData(current => ({ ...current, assignedTo: staff[0].id }));
+    }).catch(() => toast.error('Unable to load staff members'));
+  }, []);
   const [formData, setFormData] = useState({
     title: task?.title || '',
     description: task?.description || '',
@@ -140,14 +145,14 @@ export function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
       };
 
       if (task) {
-        updateStaffTask(task.id, taskData);
+        await updateStaffTaskApi(task.id, taskData);
         toast.success('Task updated successfully!');
       } else {
-        createStaffTask(taskData);
+        await createStaffTask(taskData);
         toast.success('Task assigned successfully!');
 
         // Send email notification to the assigned staff (fire-and-forget)
-        const assignedStaff = mockStaff.find(s => s.id === formData.assignedTo);
+        const assignedStaff = activeStaffList.find(s => s.id === formData.assignedTo);
         if (assignedStaff?.email) {
           sendTaskAssignmentNotification({
             staffId: assignedStaff.id,

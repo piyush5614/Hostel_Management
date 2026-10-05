@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
@@ -12,11 +12,7 @@ import {
   Send, Loader2, Trash2, Upload, ThumbsUp, ThumbsDown,
   Download, FileSpreadsheet, FileText, Mic, Play, Pause, Volume2,
 } from 'lucide-react';
-import {
-  mockStaffTasks, mockStaff, updateStaffTask, deleteStaffTask,
-  addTaskComment, reassignTask, getStaffWorkload, getLinkedStaffId,
-} from '../store/mock-data';
-import { mockPhotoSubmissions, PhotoSubmission } from '../store/enhanced-mock-data';
+import { getStaffTasks, getStaffMembers, updateStaffTaskApi, cancelStaffTask, addTaskCommentApi } from '../services/staff-tasks';
 import { exportService } from '../services/export';
 import { StaffTask } from '../types';
 import { cn, formatDate, formatDateTime } from '../lib/utils';
@@ -43,7 +39,15 @@ export function StaffTasksPage() {
   const user = useAuthStore(s => s.user);
   const refreshKey = useDataRefresh([EVENTS.TASK_UPDATED, EVENTS.STAFF_UPDATED]);
   const isStaff = user?.role === 'staff';
-  const myStaffId = isStaff && user?.id ? getLinkedStaffId(user.id, user.email) : null;
+  const [tasks, setTasks] = useState<StaffTask[]>([]);
+  const [staffMembers, setStaffMembers] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const myStaffId = isStaff ? user?.id || null : null;
+  useEffect(() => {
+    Promise.all([getStaffTasks(), getStaffMembers()])
+      .then(([loadedTasks, loadedStaff]) => { setTasks(loadedTasks); setStaffMembers(loadedStaff); setLoadError(null); })
+      .catch(error => setLoadError(error instanceof Error ? error.message : 'Unable to load staff tasks'));
+  }, [refreshKey]);
   const [selectedTask, setSelectedTask] = useState<StaffTask | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -60,7 +64,7 @@ export function StaffTasksPage() {
   });
 
   const filteredTasks = useMemo(() => {
-    let result = [...mockStaffTasks];
+    let result = [...tasks];
 
     // Staff can only see their own tasks
     if (isStaff && myStaffId) {
@@ -88,57 +92,55 @@ export function StaffTasksPage() {
     });
 
     return result;
-  }, [searchQuery, filter, refreshKey, isStaff, myStaffId]);
+  }, [searchQuery, filter, refreshKey, isStaff, myStaffId, tasks]);
 
-  const workload = useMemo(() => getStaffWorkload(), []);
+  const workload = useMemo(() => staffMembers.map(staff => ({ staff, tasks: tasks.filter(task => task.assignedTo === staff.id) })), [staffMembers, tasks]);
 
-  const getStaffName = (id: string) => mockStaff.find(s => s.id === id)?.name || 'Unknown';
-  const getStaff = (id: string) => mockStaff.find(s => s.id === id);
+  const getStaffName = (id: string) => staffMembers.find(s => s.id === id)?.name || 'Unknown';
+  const getStaff = (id: string) => staffMembers.find(s => s.id === id);
 
   const isOverdue = (task: StaffTask) => {
     if (task.status === 'completed' || task.status === 'cancelled') return false;
     return new Date(task.dueDate) < new Date();
   };
 
-  const handleStatusUpdate = (task: StaffTask, newStatus: StaffTask['status']) => {
+  const handleStatusUpdate = async (task: StaffTask, newStatus: StaffTask['status']) => {
     const updates: Partial<StaffTask> = { status: newStatus };
     if (newStatus === 'completed') {
       updates.completedAt = new Date().toISOString();
     }
-    updateStaffTask(task.id, updates);
-    toast.success(`Task marked as ${newStatus}`);
-    // Refresh selected
-    const updated = mockStaffTasks.find(t => t.id === task.id);
-    if (updated) setSelectedTask({ ...updated });
+    try {
+      const updated = await updateStaffTaskApi(task.id, updates);
+      setTasks(current => current.map(item => item.id === updated.id ? updated : item));
+      setSelectedTask(updated);
+      toast.success(`Task marked as ${newStatus}`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Failed to update task'); }
   };
 
-  const handleAddComment = (taskId: string) => {
+  const handleAddComment = async (taskId: string) => {
     if (!commentText.trim()) return;
-    addTaskComment(taskId, {
-      taskId,
-      userId: user?.id || 'admin',
-      userName: user?.name || 'Admin',
-      userRole: user?.role || 'admin',
-      content: commentText,
-    });
-    setCommentText('');
-    toast.success('Comment added');
-    const updated = mockStaffTasks.find(t => t.id === taskId);
-    if (updated) setSelectedTask({ ...updated });
+    try {
+      await addTaskCommentApi(taskId, commentText);
+      const refreshed = (await getStaffTasks()).find(task => task.id === taskId);
+      if (refreshed) { setTasks(current => current.map(item => item.id === taskId ? refreshed : item)); setSelectedTask(refreshed); }
+      setCommentText(''); toast.success('Comment added');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Failed to add comment'); }
   };
 
-  const handleReassign = (taskId: string, newStaffId: string) => {
-    reassignTask(taskId, newStaffId);
-    toast.success('Task reassigned');
-    const updated = mockStaffTasks.find(t => t.id === taskId);
-    if (updated) setSelectedTask({ ...updated });
+  const handleReassign = async (taskId: string, newStaffId: string) => {
+    try {
+      const updated = await updateStaffTaskApi(taskId, { assignedTo: newStaffId, reassignedFrom: selectedTask?.assignedTo, reassignedAt: new Date().toISOString() });
+      setTasks(current => current.map(item => item.id === taskId ? updated : item)); setSelectedTask(updated); toast.success('Task reassigned');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Failed to reassign task'); }
   };
 
   const handleDeleteTask = (task: StaffTask) => {
     if (window.confirm(`Cancel task "${task.title}"?`)) {
-      deleteStaffTask(task.id);
-      toast.success('Task cancelled');
-      if (selectedTask?.id === task.id) setSelectedTask(null);
+      cancelStaffTask(task.id).then(() => {
+        setTasks(current => current.map(item => item.id === task.id ? { ...item, status: 'cancelled' } : item));
+        if (selectedTask?.id === task.id) setSelectedTask(null);
+        toast.success('Task cancelled');
+      }).catch(error => toast.error(error instanceof Error ? error.message : 'Failed to cancel task'));
     }
   };
 
@@ -164,7 +166,7 @@ export function StaffTasksPage() {
   };
 
   // Stats - for staff, show only their tasks; for admin/warden show all
-  const taskSource = isStaff && myStaffId ? mockStaffTasks.filter(t => t.assignedTo === myStaffId) : mockStaffTasks;
+  const taskSource = isStaff && myStaffId ? tasks.filter(t => t.assignedTo === myStaffId) : tasks;
   const stats = useMemo(() => ({
     total: taskSource.length,
     pending: taskSource.filter(t => t.status === 'pending').length,
@@ -175,6 +177,7 @@ export function StaffTasksPage() {
 
   return (
     <div className="space-y-6">
+    {loadError && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{loadError}</div>}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -343,7 +346,7 @@ export function StaffTasksPage() {
                 label="Assigned To"
                 options={[
                   { value: '', label: 'All Staff' },
-                  ...mockStaff.filter(s => s.isActive).map(s => ({ value: s.id, label: s.name })),
+                  ...staffMembers.filter(s => s.isActive).map(s => ({ value: s.id, label: s.name })),
                 ]}
                 value={filter.assignedTo}
                 onChange={(e) => setFilter(p => ({ ...p, assignedTo: e.target.value }))}
@@ -464,6 +467,7 @@ export function StaffTasksPage() {
               canManage={canManage}
               isStaff={isStaff}
               userRole={user?.role || 'staff'}
+              staffMembers={staffMembers}
               onStatusUpdate={handleStatusUpdate}
               onReassign={handleReassign}
               commentText={commentText}
@@ -474,8 +478,10 @@ export function StaffTasksPage() {
                 setIsEditModalOpen(true);
               }}
               onTaskRefresh={(taskId: string) => {
-                const updated = mockStaffTasks.find(t => t.id === taskId);
-                if (updated) setSelectedTask({ ...updated });
+                getStaffTasks().then(loaded => {
+                  const updated = loaded.find(item => item.id === taskId);
+                  if (updated) { setTasks(loaded); setSelectedTask(updated); }
+                }).catch(() => undefined);
               }}
             />
           </div>
@@ -485,7 +491,10 @@ export function StaffTasksPage() {
       {/* Add Task Modal */}
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Create New Task" size="xl">
         <TaskForm
-          onSuccess={() => { setIsAddModalOpen(false); }}
+          onSuccess={() => {
+            setIsAddModalOpen(false);
+            getStaffTasks().then(setTasks).catch(error => toast.error(error instanceof Error ? error.message : 'Failed to refresh tasks'));
+          }}
           onCancel={() => setIsAddModalOpen(false)}
         />
       </Modal>
@@ -498,8 +507,10 @@ export function StaffTasksPage() {
             onSuccess={() => {
               setIsEditModalOpen(false);
               setEditingTask(null);
-              const updated = mockStaffTasks.find(t => t.id === editingTask.id);
-              if (updated) setSelectedTask({ ...updated });
+              getStaffTasks().then(loaded => {
+                const updated = loaded.find(item => item.id === editingTask.id);
+                if (updated) { setTasks(loaded); setSelectedTask(updated); }
+              }).catch(() => undefined);
             }}
             onCancel={() => setIsEditModalOpen(false)}
           />
@@ -576,6 +587,7 @@ function TaskDetailPanel({
   canManage,
   isStaff,
   userRole,
+  staffMembers,
   onStatusUpdate,
   onReassign,
   commentText,
@@ -588,6 +600,7 @@ function TaskDetailPanel({
   canManage: boolean;
   isStaff: boolean;
   userRole: string;
+  staffMembers: any[];
   onStatusUpdate: (task: StaffTask, status: StaffTask['status']) => void;
   onReassign: (taskId: string, staffId: string) => void;
   commentText: string;
@@ -600,8 +613,8 @@ function TaskDetailPanel({
   const [reassignTo, setReassignTo] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const proofInputRef = useRef<HTMLInputElement>(null);
-  const staff = mockStaff.find(s => s.id === task.assignedTo);
-  const assignedByStaff = mockStaff.find(s => s.userId === task.assignedBy || s.id === task.assignedBy);
+  const staff = staffMembers.find(member => member.id === task.assignedTo);
+  const assignedByStaff = staffMembers.find(member => member.userId === task.assignedBy || member.id === task.assignedBy);
   const overdue = task.status !== 'completed' && task.status !== 'cancelled' && new Date(task.dueDate) < new Date();
 
   const StatusIcon = statusConfig[task.status]?.icon;
@@ -674,22 +687,9 @@ function TaskDetailPanel({
 
       const existing = task.workInProgressPhotos || [];
       const allPhotos = [...existing, ...newPhotos];
-      updateStaffTask(task.id, {
+      await updateStaffTaskApi(task.id, {
         workInProgressPhotos: allPhotos,
         photoSubmissionStatus: 'pending',
-      });
-
-      // Also create a PhotoSubmission record so warden/admin dashboard can see it
-      const staffMember = mockStaff.find(s => s.id === task.assignedTo);
-      mockPhotoSubmissions.push({
-        id: `photo-${Date.now()}`,
-        taskId: task.id,
-        staffId: task.assignedTo,
-        photos: allPhotos,
-        submittedAt: new Date().toISOString(),
-        status: 'pending',
-        taskTitle: task.title,
-        staffName: staffMember?.name || 'Unknown Staff',
       });
 
       toast.success(`${newPhotos.length} proof file(s) uploaded — awaiting approval`);
@@ -702,16 +702,20 @@ function TaskDetailPanel({
     }
   };
 
-  const handleApproveProof = () => {
-    updateStaffTask(task.id, { photoSubmissionStatus: 'approved' });
-    toast.success('Task proof approved');
-    onTaskRefresh(task.id);
+  const handleApproveProof = async () => {
+    try {
+      await updateStaffTaskApi(task.id, { photoSubmissionStatus: 'approved', status: 'completed', completedAt: new Date().toISOString() });
+      toast.success('Task proof approved');
+      onTaskRefresh(task.id);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Failed to approve proof'); }
   };
 
-  const handleRejectProof = () => {
-    updateStaffTask(task.id, { photoSubmissionStatus: 'rejected' });
-    toast.error('Task proof rejected');
-    onTaskRefresh(task.id);
+  const handleRejectProof = async () => {
+    try {
+      await updateStaffTaskApi(task.id, { photoSubmissionStatus: 'rejected' });
+      toast.error('Task proof rejected');
+      onTaskRefresh(task.id);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Failed to reject proof'); }
   };
 
   return (
@@ -796,7 +800,7 @@ function TaskDetailPanel({
                 className="flex-1 rounded-lg border px-3 py-1.5 text-sm dark:bg-gray-700 dark:border-gray-600"
               >
                 <option value="">Select staff...</option>
-                {mockStaff.filter(s => s.isActive && s.id !== task.assignedTo).map(s => (
+                {staffMembers.filter(s => s.isActive && s.id !== task.assignedTo).map(s => (
                   <option key={s.id} value={s.id}>{s.name} ({s.position})</option>
                 ))}
               </select>
