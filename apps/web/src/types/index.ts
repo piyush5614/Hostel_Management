@@ -226,7 +226,7 @@ export interface Visitor {
   idProofType: string;
   idProofNumber?: string;
   vehicleNumber?: string;
-  approvedBy: string;
+  approvedBy?: string;
   visitDuration?: number;
   remarks?: string;
   photo?: string;

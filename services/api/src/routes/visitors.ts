@@ -37,6 +37,16 @@ router.get('/', authenticate, authorize('admin', 'warden', 'staff'), async (req:
       query = query.is('check_out_time', null);
     }
 
+    const studentId = req.query.student_id || req.query.studentId;
+    if (typeof studentId === 'string' && studentId.trim()) {
+      query = query.eq('student_id', studentId.trim());
+    }
+
+    const staffId = req.query.staff_id || req.query.staffId;
+    if (typeof staffId === 'string' && staffId.trim()) {
+      query = query.eq('staff_id', staffId.trim());
+    }
+
     if (typeof req.query.date === 'string' && req.query.date.trim()) {
       const dateStr = req.query.date.trim();
       query = query.gte('check_in_time', `${dateStr}T00:00:00`)
@@ -176,9 +186,22 @@ router.patch('/:id/checkout', authenticate, authorize('admin', 'warden', 'staff'
       return;
     }
 
+    const checkOutTime = new Date().toISOString();
+    const visitDuration = Math.max(
+      0,
+      Math.round((new Date(checkOutTime).getTime() - new Date(existing.check_in_time).getTime()) / 60000)
+    );
+    const updates: Record<string, string | number> = {
+      check_out_time: checkOutTime,
+      visit_duration: visitDuration,
+    };
+    if (typeof req.body.remarks === 'string') {
+      updates.remarks = req.body.remarks;
+    }
+
     const { error: updateError } = await db
       .from('visitors')
-      .update({ check_out_time: new Date().toISOString() })
+      .update(updates)
       .eq('id', req.params.id)
       .eq('college_id', collegeId);
 
@@ -196,6 +219,29 @@ router.patch('/:id/checkout', authenticate, authorize('admin', 'warden', 'staff'
     res.json(updated);
   } catch (error) {
     console.error('Visitor checkout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.patch('/:id/approve', authenticate, authorize('admin', 'warden', 'staff'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const db = await getDb();
+    const collegeId = resolveCollegeId(req.user?.collegeId);
+    const { data: updated, error } = await db
+      .from('visitors')
+      .update({ approved_by: req.user?.userId })
+      .eq('id', req.params.id)
+      .eq('college_id', collegeId)
+      .select('*')
+      .single();
+
+    if (error || !updated) {
+      res.status(404).json({ error: 'Visitor not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (error) {
+    console.error('Approve visitor error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

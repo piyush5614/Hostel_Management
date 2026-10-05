@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -6,7 +6,8 @@ import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Modal } from '../components/ui/modal';
 import { useAuthStore } from '../store/auth-store';
-import { mockVisitors, mockStudents, mockStaff, exportData } from '../store/mock-data';
+import { mockStudents, mockStaff, exportData } from '../store/mock-data';
+import { visitorsService } from '../services/visitors';
 import { Visitor } from '../types';
 import { Users, Plus, Download, LogIn, LogOut, Clock, Camera, Upload, X, Image } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +18,9 @@ export function VisitorManagementPage() {
   const user = useAuthStore((state) => state.user);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
+  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -32,62 +36,67 @@ export function VisitorManagementPage() {
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const galleryInputRef = React.useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    void loadVisitors();
+  }, []);
+
+  const loadVisitors = async () => {
+    try {
+      setIsLoading(true);
+      setVisitors(await visitorsService.list());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load visitors');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getVisitorStats = () => {
     const today = new Date().toISOString().split('T')[0];
-    const todayVisitors = mockVisitors.filter(v => v.checkInTime.startsWith(today));
-    const activeVisitors = mockVisitors.filter(v => v.checkInTime && !v.checkOutTime);
-    const totalVisitors = mockVisitors.length;
+    const todayVisitors = visitors.filter(v => v.checkInTime.startsWith(today));
+    const activeVisitors = visitors.filter(v => !v.checkOutTime);
+    const completed = visitors.filter(v => v.visitDuration !== undefined);
+    const averageStay = completed.length
+      ? completed.reduce((total, visitor) => total + (visitor.visitDuration || 0), 0) / completed.length / 60
+      : 0;
 
     return {
       today: todayVisitors.length,
       active: activeVisitors.length,
       total: totalVisitors,
-      averageStay: 2.5 // hours - would be calculated from actual data
+      averageStay: Number(averageStay.toFixed(1))
     };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user?.id) return;
-
-    const newVisitor: Visitor = {
-      id: Date.now().toString(),
-      ...formData,
-      checkInTime: new Date().toISOString(),
-      approvedBy: user.id,
-    };
-
-    mockVisitors.push(newVisitor);
-    toast.success('Visitor registered successfully!');
-    setIsCreateModalOpen(false);
-    setFormData({
-      name: '',
-      contactNumber: '',
-      purpose: '',
-      studentId: '',
-      staffId: '',
-      idProofType: 'aadhar',
-      idProofNumber: '',
-      vehicleNumber: '',
-      photo: '',
-    });
+    if (!user?.id || isSaving) return;
+    try {
+      setIsSaving(true);
+      const created = await visitorsService.create(formData);
+      setVisitors((current) => [created, ...current]);
+      toast.success('Visitor registered successfully!');
+      setIsCreateModalOpen(false);
+      setFormData({
+        name: '', contactNumber: '', purpose: '', studentId: '', staffId: '',
+        idProofType: 'aadhar', idProofNumber: '', vehicleNumber: '', photo: '',
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to register visitor');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleCheckOut = (visitorId: string) => {
-    const visitorIndex = mockVisitors.findIndex(v => v.id === visitorId);
-    if (visitorIndex !== -1) {
-      const checkOutTime = new Date().toISOString();
-      const checkInTime = new Date(mockVisitors[visitorIndex].checkInTime);
-      const visitDuration = Math.round((new Date(checkOutTime).getTime() - checkInTime.getTime()) / (1000 * 60)); // minutes
-
-      mockVisitors[visitorIndex] = {
-        ...mockVisitors[visitorIndex],
-        checkOutTime,
-        visitDuration
-      };
-      
+  const handleCheckOut = async (visitorId: string) => {
+    try {
+      const updated = await visitorsService.checkout(visitorId);
+      setVisitors((current) => current.map((visitor) => visitor.id === visitorId ? updated : visitor));
+      setSelectedVisitor((current) => current?.id === visitorId ? updated : current);
       toast.success('Visitor checked out successfully!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to check out visitor');
     }
   };
 
@@ -194,7 +203,9 @@ export function VisitorManagementPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockVisitors.map((visitor) => (
+                {isLoading ? (
+                  <div className="py-12 text-center text-muted-foreground">Loading visitors...</div>
+                ) : visitors.map((visitor) => (
                   <div
                     key={visitor.id}
                     className={cn(
@@ -261,7 +272,7 @@ export function VisitorManagementPage() {
                   </div>
                 ))}
                 
-                {mockVisitors.length === 0 && (
+                {!isLoading && visitors.length === 0 && (
                   <div className="py-12 text-center text-muted-foreground">
                     <Users className="mx-auto mb-4 h-12 w-12 opacity-30" />
                     <p>No visitors registered yet.</p>
@@ -548,8 +559,8 @@ export function VisitorManagementPage() {
             <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              Register Visitor
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Registering...' : 'Register Visitor'}
             </Button>
           </div>
         </form>
