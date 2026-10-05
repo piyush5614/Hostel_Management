@@ -44,7 +44,7 @@ export function EnhancedLeaveForm({ student, onSuccess, onCancel }: EnhancedLeav
     setIsSubmitting(true);
     try {
       // Submit leave request with status 'pending' — no auto SMS / auto-approve
-      submitLeaveRequest({
+      await submitLeaveRequest({
         studentId: student.id,
         type: formData.type,
         startDate: formData.startDate,

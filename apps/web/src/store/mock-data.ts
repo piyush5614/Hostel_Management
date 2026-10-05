@@ -898,32 +898,24 @@ export const syncLeaveRequestsFromApi = async (): Promise<LeaveRequest[]> => {
   }
 
   try {
-    const rows = await apiRequest<any[]>('/leave-requests', { method: 'GET' });
+    const response = await apiRequest<any>('/leave-requests', { method: 'GET' });
+    const rows = Array.isArray(response) ? response : response?.data;
     if (Array.isArray(rows)) {
       mockLeaveRequests = rows.map(mapLeaveRequestFromApi);
       saveToStorage();
       eventBus.emit(EVENTS.LEAVE_UPDATED);
     }
   } catch (error) {
-    console.warn('Failed to sync leave requests from API, using local cache:', error);
+    console.error('Failed to sync leave requests from API:', error);
+    mockLeaveRequests = [];
+    eventBus.emit(EVENTS.LEAVE_UPDATED);
   }
 
   return mockLeaveRequests;
 };
 
-export const submitLeaveRequest = (request: Omit<LeaveRequest, 'id' | 'submittedAt' | 'status'>) => {
-  const newRequest: LeaveRequest = {
-    ...request,
-    id: Date.now().toString(),
-    submittedAt: new Date().toISOString(),
-    status: 'pending'
-  };
-
-  upsertLeaveRequest(newRequest);
-  saveToStorage();
-  eventBus.emit(EVENTS.LEAVE_UPDATED);
-
-  void apiRequest<any>('/leave-requests', {
+export const submitLeaveRequest = async (request: Omit<LeaveRequest, 'id' | 'submittedAt' | 'status'>) => {
+  const row = await apiRequest<any>('/leave-requests', {
     method: 'POST',
     body: JSON.stringify({
       studentId: request.studentId,
@@ -933,122 +925,49 @@ export const submitLeaveRequest = (request: Omit<LeaveRequest, 'id' | 'submitted
       reason: request.reason,
       emergencyContact: request.emergencyContact,
     }),
-  })
-    .then((row) => {
-      const mapped = mapLeaveRequestFromApi(row);
-      const optimisticIndex = mockLeaveRequests.findIndex((r) => r.id === newRequest.id);
-      if (optimisticIndex >= 0) {
-        mockLeaveRequests[optimisticIndex] = mapped;
-      } else {
-        upsertLeaveRequest(mapped);
-      }
-      saveToStorage();
-      eventBus.emit(EVENTS.LEAVE_UPDATED);
-    })
-    .catch((error) => {
-      console.warn('Failed to persist leave request to API, kept local copy:', error);
-    });
-
-  return newRequest;
+  });
+  const persistedRequest = mapLeaveRequestFromApi(row);
+  upsertLeaveRequest(persistedRequest);
+  saveToStorage();
+  eventBus.emit(EVENTS.LEAVE_UPDATED);
+  return persistedRequest;
 };
 
-export const approveLeaveRequest = (id: string, approverComments?: string) => {
-  const requestIndex = mockLeaveRequests.findIndex(req => req.id === id);
-  if (requestIndex !== -1) {
-    mockLeaveRequests[requestIndex] = {
-      ...mockLeaveRequests[requestIndex],
-      status: 'approved',
-      reviewedAt: new Date().toISOString(),
-      approverComments
-    };
-    
-    // Update student status
-    const student = mockStudents.find(s => s.id === mockLeaveRequests[requestIndex].studentId);
-    if (student) {
-      updateStudent(student.id, { currentStatus: 'on-leave' });
-    }
-    
-    saveToStorage();
-    eventBus.emit(EVENTS.LEAVE_UPDATED);
-
-    void apiRequest<any>(`/leave-requests/${id}/approve`, {
-      method: 'PATCH',
-      body: JSON.stringify({ approverComments }),
-    })
-      .then((row) => {
-        upsertLeaveRequest(mapLeaveRequestFromApi(row));
-        saveToStorage();
-        eventBus.emit(EVENTS.LEAVE_UPDATED);
-      })
-      .catch((error) => {
-        console.warn('Failed to approve leave request in API, kept local state:', error);
-      });
-
-    return mockLeaveRequests[requestIndex];
-  }
-  return null;
+export const approveLeaveRequest = async (id: string, approverComments?: string) => {
+  const row = await apiRequest<any>(`/leave-requests/${id}/approve`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approverComments }),
+  });
+  const persistedRequest = mapLeaveRequestFromApi(row);
+  upsertLeaveRequest(persistedRequest);
+  saveToStorage();
+  eventBus.emit(EVENTS.LEAVE_UPDATED);
+  return persistedRequest;
 };
 
-export const rejectLeaveRequest = (id: string, approverComments?: string) => {
-  const requestIndex = mockLeaveRequests.findIndex(req => req.id === id);
-  if (requestIndex !== -1) {
-    mockLeaveRequests[requestIndex] = {
-      ...mockLeaveRequests[requestIndex],
-      status: 'rejected',
-      reviewedAt: new Date().toISOString(),
-      approverComments
-    };
-    saveToStorage();
-    eventBus.emit(EVENTS.LEAVE_UPDATED);
-
-    void apiRequest<any>(`/leave-requests/${id}/reject`, {
-      method: 'PATCH',
-      body: JSON.stringify({ approverComments }),
-    })
-      .then((row) => {
-        upsertLeaveRequest(mapLeaveRequestFromApi(row));
-        saveToStorage();
-        eventBus.emit(EVENTS.LEAVE_UPDATED);
-      })
-      .catch((error) => {
-        console.warn('Failed to reject leave request in API, kept local state:', error);
-      });
-
-    return mockLeaveRequests[requestIndex];
-  }
-  return null;
+export const rejectLeaveRequest = async (id: string, approverComments?: string) => {
+  const row = await apiRequest<any>(`/leave-requests/${id}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approverComments }),
+  });
+  const persistedRequest = mapLeaveRequestFromApi(row);
+  upsertLeaveRequest(persistedRequest);
+  saveToStorage();
+  eventBus.emit(EVENTS.LEAVE_UPDATED);
+  return persistedRequest;
 };
 
 // Record parent call verification for a leave request
-export const recordParentCall = (leaveRequestId: string, calledBy: string, notes?: string) => {
-  const requestIndex = mockLeaveRequests.findIndex(req => req.id === leaveRequestId);
-  if (requestIndex !== -1) {
-    mockLeaveRequests[requestIndex] = {
-      ...mockLeaveRequests[requestIndex],
-      parentCallVerified: true,
-      parentCallTimestamp: new Date().toISOString(),
-      parentCallBy: calledBy,
-      parentCallNotes: notes || '',
-    };
-    saveToStorage();
-    eventBus.emit(EVENTS.LEAVE_UPDATED);
-
-    void apiRequest<any>(`/leave-requests/${leaveRequestId}/verify-call`, {
-      method: 'PATCH',
-      body: JSON.stringify({ notes }),
-    })
-      .then((row) => {
-        upsertLeaveRequest(mapLeaveRequestFromApi(row));
-        saveToStorage();
-        eventBus.emit(EVENTS.LEAVE_UPDATED);
-      })
-      .catch((error) => {
-        console.warn('Failed to save parent-call verification in API, kept local state:', error);
-      });
-
-    return mockLeaveRequests[requestIndex];
-  }
-  return null;
+export const recordParentCall = async (leaveRequestId: string, calledBy: string, notes?: string) => {
+  const row = await apiRequest<any>(`/leave-requests/${leaveRequestId}/verify-call`, {
+    method: 'PATCH',
+    body: JSON.stringify({ notes }),
+  });
+  const persistedRequest = mapLeaveRequestFromApi(row);
+  upsertLeaveRequest(persistedRequest);
+  saveToStorage();
+  eventBus.emit(EVENTS.LEAVE_UPDATED);
+  return persistedRequest;
 };
 
 // Find leave request by parent phone number (guardian contact)

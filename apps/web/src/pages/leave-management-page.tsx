@@ -20,6 +20,7 @@ import {
   rejectLeaveRequest,
   recordParentCall,
   syncLeaveRequestsFromApi,
+  syncStudentsFromApi,
   submitStaffLeaveRequest,
   approveStaffLeaveRequest,
   rejectStaffLeaveRequest,
@@ -70,7 +71,7 @@ export function LeaveManagementPage() {
     if (!user?.id) {
       return;
     }
-    void syncLeaveRequestsFromApi();
+    void Promise.all([syncStudentsFromApi(), syncLeaveRequestsFromApi()]);
   }, [user?.id]);
 
   // Resolve linked IDs
@@ -169,14 +170,14 @@ export function LeaveManagementPage() {
 
   // --- Student Leave handlers ---
   // --- QR Scanner callback ---
-  const handleQRCallConfirmed = (data: {
+  const handleQRCallConfirmed = async (data: {
     leaveRequestId: string;
     phone: string;
     studentName: string;
     parentName: string;
     notes: string;
   }) => {
-    const result = recordParentCall(data.leaveRequestId, user?.id || 'unknown', data.notes);
+    const result = await recordParentCall(data.leaveRequestId, user?.id || 'unknown', data.notes);
     if (result) {
       toast.success(`Parent call verified for ${data.studentName}'s leave request`);
       // Auto-select the verified leave request
@@ -191,21 +192,29 @@ export function LeaveManagementPage() {
     return mockStudents.find(s => s.id === studentId) || null;
   };
 
-  const handleApprove = (requestId: string) => {
+  const handleApprove = async (requestId: string) => {
     const request = mockLeaveRequests.find(r => r.id === requestId);
     if (request && !request.parentCallVerified && canManageLeave) {
       toast.error('You must scan the QR code and call the parent before approving.');
       return;
     }
-    approveLeaveRequest(requestId);
-    toast.success('Leave request approved!');
-    setSelectedRequest(null);
+    try {
+      await approveLeaveRequest(requestId);
+      toast.success('Leave request approved!');
+      setSelectedRequest(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to approve leave request');
+    }
   };
 
-  const handleReject = (requestId: string) => {
-    rejectLeaveRequest(requestId);
-    toast.success('Leave request rejected!');
-    setSelectedRequest(null);
+  const handleReject = async (requestId: string) => {
+    try {
+      await rejectLeaveRequest(requestId);
+      toast.success('Leave request rejected!');
+      setSelectedRequest(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reject leave request');
+    }
   };
 
   const handleCheckOut = (studentId: string) => {

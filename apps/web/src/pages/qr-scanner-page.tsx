@@ -139,16 +139,16 @@ export function QRScannerPage() {
     setStep('confirming');
   };
 
-  const handleConfirmCall = () => {
+  const handleConfirmCall = async () => {
     if (!scanResult || !callConfirmed) return;
 
-    const result = recordParentCall(
-      scanResult.leaveRequestId,
-      user?.id || 'unknown',
-      callNotes
-    );
+    try {
+      const result = await recordParentCall(
+        scanResult.leaveRequestId,
+        user?.id || 'unknown',
+        callNotes
+      );
 
-    if (result) {
       toast.success(`Parent call verified for ${scanResult.studentName}'s leave request`);
       setScanHistory((prev) => [
         {
@@ -162,8 +162,9 @@ export function QRScannerPage() {
         },
         ...prev,
       ]);
-    } else {
-      toast.error('Leave request not found. It may have already been processed.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to verify parent call');
+      return;
     }
 
     // Reset for next scan
