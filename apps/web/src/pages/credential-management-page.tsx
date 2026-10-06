@@ -1,13 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
 import {
-  Key, Search, Copy, Check, RefreshCw, Shield,
+  Key, Search, Copy, Check, Shield,
   UserCircle, Download, Clock, AlertCircle,
 } from 'lucide-react';
-import { mockCredentials, mockStaff, mockStudents, resetCredentialPassword, mockActivityLogs } from '../store/mock-data';
+import { mockCredentials, mockStaff, mockStudents, syncStaffFromApi, syncStudentsFromApi, mockActivityLogs } from '../store/mock-data';
 import { GeneratedCredential } from '../types';
 import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { toast } from 'sonner';
@@ -22,6 +22,16 @@ export function CredentialManagementPage() {
   const [copiedField, setCopiedField] = useState('');
   const [activeTab, setActiveTab] = useState<'credentials' | 'activity'>('credentials');
   const dataRefreshKey = useDataRefresh([EVENTS.STAFF_UPDATED, EVENTS.STUDENT_UPDATED]);
+  const [apiRefreshKey, setApiRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    void Promise.all([syncStaffFromApi(), syncStudentsFromApi()])
+      .then(() => setApiRefreshKey((value) => value + 1))
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : 'Unable to load credentials');
+      });
+  }, [user, dataRefreshKey]);
 
   // Build credential list from existing staff/students + generated ones
   const allCredentials = useMemo(() => {
@@ -61,7 +71,7 @@ export function CredentialManagementPage() {
     });
 
     return creds;
-  }, [dataRefreshKey]);
+  }, [dataRefreshKey, apiRefreshKey]);
 
   const filteredCredentials = useMemo(() => {
     let result = [...allCredentials];
@@ -82,16 +92,6 @@ export function CredentialManagementPage() {
     setCopiedField(field);
     setTimeout(() => setCopiedField(''), 2000);
     toast.success('Copied to clipboard');
-  };
-
-  const handleResetPassword = (credential: GeneratedCredential) => {
-    if (!window.confirm(`Reset password for ${credential.name}?`)) return;
-    const newPassword = resetCredentialPassword(credential.id);
-    if (newPassword) {
-      toast.success(`Password reset for ${credential.name}. New password: ${newPassword}`);
-    } else {
-      toast.error('Failed to reset password');
-    }
   };
 
   const handleExportCSV = () => {
@@ -262,14 +262,7 @@ export function CredentialManagementPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(cred.createdAt)}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleResetPassword(cred)}
-                            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
-                          >
-                            <RefreshCw className="h-3 w-3" /> Reset
-                          </button>
-                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">Managed by Admin</td>
                       </tr>
                     ))}
                   </tbody>
