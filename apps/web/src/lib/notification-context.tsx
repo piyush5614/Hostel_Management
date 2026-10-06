@@ -165,7 +165,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const response = await fetch('/api/notifications', {
       method: 'DELETE',
       headers: {
-        Authorization: `******
+        Authorization: `Bearer ${token}`,
       },
     });
     if (!response.ok) {
