@@ -163,6 +163,29 @@ export function createNotificationRoutes(io?: Server) {
   });
 
   /**
+   * DELETE /api/notifications
+   * Delete all notifications for the authenticated user
+   */
+  router.delete('/', async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const collegeId = resolveCollegeId(req.user?.collegeId);
+      const db = await getDb();
+      const { error } = await db
+        .from('notifications')
+        .delete()
+        .eq('college_id', collegeId)
+        .eq('user_id', userId);
+      if (error) throw error;
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      res.status(500).json({ error: 'Failed to clear notifications' });
+    }
+  });
+
+  /**
    * DELETE /api/notifications/:id
    * Delete notification
    */

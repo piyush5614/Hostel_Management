@@ -22,7 +22,7 @@ interface NotificationContextType {
   unreadCount: number;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  clearAll: () => void;
+  clearAll: () => Promise<void>;
   isLoading: boolean;
   error: string | null;
 }
@@ -158,7 +158,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback(async () => {
+    const token = useAuthStore.getState().getToken();
+    if (!token) return;
+
+    const response = await fetch('/api/notifications', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `******
+      },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to clear notifications');
+    }
+
     setNotifications([]);
   }, []);
 
