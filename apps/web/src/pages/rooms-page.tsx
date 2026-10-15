@@ -264,8 +264,11 @@ export function RoomsPage() {
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3">
                 {filteredRooms.map((room) => (
-                  <button
+                  <div
                     key={room.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedRoom?.id === room.id}
                     className={cn(
                       'group relative flex flex-col items-center rounded-md border p-3 text-center transition-colors',
                       selectedRoom?.id === room.id
@@ -275,6 +278,12 @@ export function RoomsPage() {
                       room.status === 'full' && 'border-error-300 bg-error-50 dark:bg-error-900/10'
                     )}
                     onClick={() => setSelectedRoom(room)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedRoom(room);
+                      }
+                    }}
                   >
                     {/* Action buttons */}
                     <div className="absolute right-1 top-1 flex space-x-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -313,7 +322,7 @@ export function RoomsPage() {
                     <span className="mt-1 text-xs">
                       {room.occupiedBeds}/{room.totalBeds} beds
                     </span>
-                  </button>
+                  </div>
                 ))}
               </div>
               

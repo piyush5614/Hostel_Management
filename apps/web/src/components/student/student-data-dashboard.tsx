@@ -5,26 +5,36 @@ import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Modal } from '../ui/modal';
 import {
-  getAllEnhancedStudents,
-  enhancedMockStaff,
   getHistoricalAttendance
 } from '../../store/enhanced-mock-data';
+import { mockStudents, syncStudentsFromApi } from '../../store/mock-data';
 import { Student } from '../../types';
 import { Users, Search, Download, Eye, CircleUser as UserCircle, Phone, Mail, MapPin, Calendar, BookOpen, Heart, AlertTriangle, CheckCircle2, Clock, Filter, Grid2x2 as Grid, List, Star, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
+import { useDataRefresh } from '../../utils/use-data-refresh';
+import { EVENTS } from '../../utils/event-bus';
 
 interface StudentDataDashboardProps {
   userRole: string;
 }
 
 export function StudentDataDashboard({ userRole }: StudentDataDashboardProps) {
-  const [students] = useState(getAllEnhancedStudents());
+  const studentRefreshKey = useDataRefresh([EVENTS.STUDENT_UPDATED]);
+  const [students, setStudents] = useState<Student[]>(() => [...mockStudents]);
   const [filteredStudents, setFilteredStudents] = useState(students);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  React.useEffect(() => {
+    void syncStudentsFromApi();
+  }, []);
+
+  React.useEffect(() => {
+    setStudents([...mockStudents]);
+  }, [studentRefreshKey]);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');

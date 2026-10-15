@@ -70,6 +70,8 @@ interface BackendLoginResult {
   token: string;
 }
 
+const AUTH_SESSION_KEY = 'tc-hostel-enhanced-session';
+
 async function backendLogin(identifier: string, password: string): Promise<BackendLoginResult | null> {
   try {
     const collegeId = getActiveCollegeId();
@@ -92,7 +94,8 @@ async function backendLogin(identifier: string, password: string): Promise<Backe
     });
     return result;
   } catch {
-    return null; // backend unreachable
+    console.error('🔎 Auth diagnostic: backend login request failed');
+    return null;
   }
 }
 
@@ -172,7 +175,7 @@ export const supabase = {
         };
 
         currentSession = mockSession;
-        localStorage.setItem('tc-hostel-enhanced-session', JSON.stringify(mockSession));
+        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(mockSession));
 
         return { data: { user: mockUser, session: mockSession }, error: null };
       }
@@ -184,19 +187,25 @@ export const supabase = {
     },
 
     getSession: async () => {
-      const stored = localStorage.getItem('tc-hostel-enhanced-session');
+      const stored = localStorage.getItem(AUTH_SESSION_KEY);
       if (stored) {
         try {
           const session = JSON.parse(stored);
-          if (session.expires_at > Date.now()) {
+          if (
+            session?.expires_at > Date.now()
+            && session?.access_token
+            && session?.user?.id
+            && session?.profile?.id === session.user.id
+            && session?.profile?.role
+          ) {
             currentSession = session;
             setActiveCollegeId(session.college_id || session?.user?.user_metadata?.college_id);
             return { data: { session }, error: null };
           } else {
-            localStorage.removeItem('tc-hostel-enhanced-session');
+            localStorage.removeItem(AUTH_SESSION_KEY);
           }
         } catch {
-          localStorage.removeItem('tc-hostel-enhanced-session');
+          localStorage.removeItem(AUTH_SESSION_KEY);
         }
       }
       return { data: { session: null }, error: null };
@@ -212,7 +221,7 @@ export const supabase = {
     signOut: async () => {
       console.log('🚪 Sign out');
       currentSession = null;
-      localStorage.removeItem('tc-hostel-enhanced-session');
+      localStorage.removeItem(AUTH_SESSION_KEY);
       return { error: null };
     },
 
@@ -266,7 +275,7 @@ export const getUserProfile = async (authId: string) => {
   // Use the profile saved with the backend-issued session first. It contains
   // the authoritative role returned by the API and supports reloads.
   try {
-    const stored = localStorage.getItem('tc-hostel-enhanced-session');
+    const stored = localStorage.getItem(AUTH_SESSION_KEY);
     if (stored) {
       const session = JSON.parse(stored);
       const persistedProfile = session?.profile;
