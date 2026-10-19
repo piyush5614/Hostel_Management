@@ -222,7 +222,7 @@ export function GateScannerPage() {
               {movement.reason && <p className="mt-1 text-sm">Reason: {movement.reason} {movement.reason_category ? `(${movement.reason_category})` : ''}</p>}
               {movement.out_time && <p className="mt-1 text-sm">Out time: {istTime(movement.out_time)}</p>}
               {movement.status === 'PENDING_REASON' && <p className="mt-1 text-sm">Waiting for the student to submit a reason…</p>}
-              {movement.status === 'OUT' && <p className="mt-1 text-sm font-medium text-amber-800">Student returning. Return has been recorded automatically.</p>}
+              {movement.status === 'OUT' && <p className="mt-1 text-sm font-medium text-amber-800">Student is currently OUT. Scan again when they return to record arrival.</p>}
             </div>
 
             {movement.status === 'PENDING_APPROVAL' && (
@@ -243,7 +243,7 @@ export function GateScannerPage() {
               <Button onClick={() => void act('cancel')} disabled={busy} variant="outline">Cancel request</Button>
             )}
             {movement.status === 'OUT' && (
-              <p className="flex items-center gap-2 font-medium text-emerald-800"><CheckCircle2 className="h-5 w-5" />Return scan complete — student is IN.</p>
+              <p className="flex items-center gap-2 font-medium text-amber-800"><CheckCircle2 className="h-5 w-5" />Departure approved — student is OUT.</p>
             )}
             {movement.status === 'RETURNED' && (
               <p className="flex items-center gap-2 font-medium text-emerald-800">

@@ -152,7 +152,7 @@ export const gateService = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
   regenerateQr(studentId: string) {
     return request<{ token: string; qrVersion: number }>(`/qr/${encodeURIComponent(studentId)}/regenerate`, {
