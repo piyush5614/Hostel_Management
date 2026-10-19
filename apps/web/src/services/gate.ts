@@ -85,6 +85,9 @@ export const gateService = {
   pendingForMe() {
     return request<{ movement: GateMovement | null }>('/movements/pending-for-me');
   },
+  requestMovement() {
+    return request<{ movement: GateMovement }>('/movements/request', { method: 'POST' });
+  },
   scan(input: { token?: string; enrollmentNo?: string }) {
     return request<{ movement: GateMovement; student: GateStudent; created: boolean; returned: boolean }>('/scan', {
       method: 'POST',

@@ -114,7 +114,10 @@ function movementRpcError(res: Response, error: string): void {
   const errors: Record<string, { status: number; message: string }> = {
     FORBIDDEN: { status: 403, message: 'This action is not allowed for your role.' },
     NOT_FOUND: { status: 404, message: 'Movement request not found.' },
+    NOT_YOUR_PROFILE: { status: 403, message: 'You can only request a movement for your own student profile.' },
     NOT_YOUR_REQUEST: { status: 403, message: 'You are not allowed to act on this request.' },
+    ACTIVE_MOVEMENT: { status: 409, message: 'You already have an active gate request or outing. Complete or cancel it before requesting another.' },
+    NO_PENDING_REQUEST: { status: 409, message: 'No departure request is pending. Ask the student to start one from their dashboard before scanning.' },
     REQUEST_EXPIRED: { status: 410, message: 'This request has expired.' },
     INVALID_TRANSITION: { status: 409, message: 'This movement is no longer in a state that allows this action.' },
     INVALID_ACTION: { status: 400, message: 'Invalid movement action.' },
@@ -204,6 +207,45 @@ export function createGateRoutes(io: SocketIOServer): Router {
       fail(res, 500, 'GATE_QR_UNAVAILABLE', 'Could not load your gate QR.');
     }
   });
+
+  router.post(
+    '/movements/request',
+    authenticate,
+    authorize('student'),
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const db = await getDb();
+        const collegeId = collegeIdFor(req.user!);
+        const student = await getStudentSnapshot(db, collegeId, { userId: req.user!.userId });
+        if (!student) {
+          fail(res, 404, 'STUDENT_NOT_FOUND', 'Student profile not found.');
+          return;
+        }
+
+        const { data, error } = await db.rpc('gate_request_movement', {
+          p_college_id: collegeId,
+          p_student_id: student.id,
+          p_student_user_id: req.user!.userId,
+          p_student_name: student.name,
+          p_enrollment_no: student.enrollmentNo,
+          p_room_number: student.roomNumber,
+          p_hostel_block: student.block,
+          p_mobile_number: student.mobileNumber,
+          p_course_year: [student.course, student.year].filter(Boolean).join(' / '),
+        });
+        if (error) throw error;
+        if (data?.error) {
+          movementRpcError(res, data.error);
+          return;
+        }
+
+        res.status(201).json({ movement: data.movement });
+      } catch (error) {
+        console.error('Start student gate movement request failed:', error);
+        fail(res, 500, 'GATE_REQUEST_FAILED', 'Could not start a new gate movement request.');
+      }
+    }
+  );
 
   router.post(
     '/qr/:studentId/regenerate',

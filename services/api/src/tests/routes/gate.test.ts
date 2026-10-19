@@ -79,4 +79,59 @@ describe('gate API authorization and request validation', () => {
     expect(response.status).toBe(403);
     expect(getDb).not.toHaveBeenCalled();
   });
+
+  it('lets a student start a request for their own next outing', async () => {
+    const movement = { id: 'movement-new', status: 'PENDING_REASON', scanned_by_role: 'student' };
+    const db = {
+      from: (table: string) => {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: async () => table === 'students'
+            ? { data: { id: 'student-record', user_id: 'test-user', enrollment_number: 'GATE-QA-1', course: 'QA', year: 1, contact_number: null, profile_image: null, room_id: null }, error: null }
+            : { data: table === 'users' ? { name: 'QA Student', profile_image: null } : null, error: null },
+        };
+        return query;
+      },
+      rpc: vi.fn().mockResolvedValue({ data: { movement, created: true }, error: null }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
+
+    const response = await request(app)
+      .post('/api/gate/movements/request')
+      .set('Authorization', `Bearer ${token('student')}`)
+      .expect(201);
+
+    expect(response.body.movement).toEqual(movement);
+    expect(db.rpc).toHaveBeenCalledWith('gate_request_movement', expect.objectContaining({
+      p_college_id: 'college-test',
+      p_student_user_id: 'test-user',
+      p_enrollment_no: 'GATE-QA-1',
+    }));
+  });
+
+  it('returns an active-request conflict instead of creating a second outing', async () => {
+    const db = {
+      from: (table: string) => {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: async () => table === 'students'
+            ? { data: { id: 'student-record', user_id: 'test-user', enrollment_number: 'GATE-QA-1', course: 'QA', year: 1, contact_number: null, profile_image: null, room_id: null }, error: null }
+            : { data: table === 'users' ? { name: 'QA Student', profile_image: null } : null, error: null },
+        };
+        return query;
+      },
+      rpc: vi.fn().mockResolvedValue({ data: { error: 'ACTIVE_MOVEMENT' }, error: null }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
+
+    const response = await request(app)
+      .post('/api/gate/movements/request')
+      .set('Authorization', `Bearer ${token('student')}`)
+      .expect(409);
+
+    expect(response.body.code).toBe('ACTIVE_MOVEMENT');
+    expect(response.body.error).toContain('already have an active');
+  });
 });

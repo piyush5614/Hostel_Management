@@ -34,6 +34,7 @@ export function GateDashboard() {
   const [category, setCategory] = useState('other');
   const [secondsLeft, setSecondsLeft] = useState(300);
   const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,6 +125,28 @@ export function GateDashboard() {
     }
   };
 
+  const requestMovement = async () => {
+    setRequesting(true);
+    setError(null);
+    try {
+      const result = await gateService.requestMovement();
+      setMovement(result.movement);
+      setReason('');
+      await refresh();
+    } catch (requestError) {
+      const requestMessage = requestError instanceof Error ? requestError.message : 'Could not start a new gate request.';
+      setError(requestMessage);
+      try {
+        await refresh();
+      } catch (refreshError) {
+        const refreshMessage = refreshError instanceof Error ? refreshError.message : 'Unknown refresh error.';
+        setError(`${requestMessage} Gate status refresh also failed: ${refreshMessage}`);
+      }
+    } finally {
+      setRequesting(false);
+    }
+  };
+
   if (loading) return <p className="py-8 text-center text-muted-foreground">Loading your gate details…</p>;
   if (error && !student) {
     return <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</div>;
@@ -132,6 +155,7 @@ export function GateDashboard() {
 
   const isOut = statusLabel(movement) === 'OUT';
   const isCompulsoryModal = movement?.status === 'PENDING_REASON';
+  const canRequestMovement = !movement || ['RETURNED', 'REJECTED', 'EXPIRED', 'CANCELLED'].includes(movement.status);
 
   return (
     <section className="space-y-6" aria-label="Gate movement">
@@ -185,6 +209,17 @@ export function GateDashboard() {
           <p className="mt-1 text-sm">Out time: {istDateTime(movement.out_time)}</p>
         </div>
       )}
+      {canRequestMovement && (
+        <Card>
+          <CardHeader><CardTitle>Start a new outing</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">Request one outing at a time. Once you return and staff scans you back in, you can request another.</p>
+            <Button onClick={() => void requestMovement()} isLoading={requesting} disabled={requesting} className="w-full sm:w-auto">
+              Request to go out
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle>My movement history</CardTitle></CardHeader>
@@ -211,7 +246,11 @@ export function GateDashboard() {
           <form onSubmit={submitReason} className="w-full max-w-lg space-y-4 rounded-2xl bg-background p-6 shadow-2xl">
             <div>
               <h2 id="gate-reason-title" className="text-xl font-bold">Reason required to leave</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Scanned by {movement.scanned_by_name || movement.scanned_by_role} · request expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {movement.scanned_by_role === 'student' ? 'Request started by you' : `Scanned by ${movement.scanned_by_name || movement.scanned_by_role}`}
+                {' · request expires in '}
+                {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+              </p>
             </div>
             {error && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>}
             <label className="block space-y-1 text-sm font-medium">
