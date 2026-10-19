@@ -18,6 +18,7 @@ export function GateScannerPage() {
   const user = useAuthStore((state) => state.user);
   const getToken = useAuthStore((state) => state.getToken);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scanInProgressRef = useRef(false);
   const [entry, setEntry] = useState('');
   const [student, setStudent] = useState<GateStudent | null>(null);
   const [movement, setMovement] = useState<GateMovement | null>(null);
@@ -46,7 +47,8 @@ export function GateScannerPage() {
 
   const processEntry = useCallback(async (value: string) => {
     const input = value.trim();
-    if (!input || busy) return;
+    if (!input || scanInProgressRef.current) return;
+    scanInProgressRef.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -65,9 +67,10 @@ export function GateScannerPage() {
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : 'Could not process the scan.');
     } finally {
+      scanInProgressRef.current = false;
       setBusy(false);
     }
-  }, [busy, stopCamera]);
+  }, [stopCamera]);
 
   useEffect(() => {
     let mounted = true;
