@@ -30,3 +30,7 @@ Take the first option that fully works:
 - A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.
 
 Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.
+
+## Supabase project access
+
+Open this workspace's Supabase project at https://supabase.com/dashboard/project/fppkdtgyrtxgimrzcoai. Use the existing signed-in browser session; open **SQL Editor** from the project sidebar when needed, and verify the project before running SQL. Never store or ask for Supabase credentials in workspace instructions.
