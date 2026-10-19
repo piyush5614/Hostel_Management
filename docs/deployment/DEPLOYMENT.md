@@ -240,6 +240,13 @@ Migrations create all tables, indexes, and seed data.
    - `20251201095933_20251201_seed_users_and_staff.sql`
    - etc.
 
+For the gate movement feature, apply these two additional SQL files after the existing schema migrations, in this order:
+
+1. `services/api/database/migrations/20261019231000_gate_movement_system.sql`
+2. `services/api/database/migrations/20261019231500_gate_movement_rpcs.sql`
+
+The migration-specific [README](../../services/api/database/migrations/README.md) documents verification and the destructive rollback procedure.
+
 #### Option B: Using Supabase CLI
 
 ```bash
@@ -274,6 +281,10 @@ After migrations:
 ---
 
 ## Health Checks & Monitoring
+
+### Gate QR camera access
+
+The gate scanner uses the browser camera. Camera access requires HTTPS in production (localhost is permitted for local development). If camera permission is denied or unavailable in the Android Capacitor WebView, allow camera access in the app/device settings and use the scanner's manual QR-token or enrollment-number entry as a fallback.
 
 ### Health Endpoint
 

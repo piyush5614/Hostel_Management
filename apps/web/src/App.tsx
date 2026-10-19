@@ -30,6 +30,9 @@ import { useAuthStore } from './store/auth-store';
 import { LanguageProvider } from './lib/language-context';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { GateScannerPage } from './pages/gate-scanner-page';
+import { CurrentlyOutPage } from './pages/currently-out-page';
+import { MovementLogPage } from './pages/movement-log-page';
 
 // Create query client instance (outside component to prevent recreation)
 const queryClient = new QueryClient();
@@ -75,6 +78,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
+  return <>{children}</>;
+};
+
+const GateStaffRoute = ({ children }: { children: React.ReactNode }) => {
+  const role = useAuthStore((state) => state.user?.role);
+  if (!role || !['admin', 'warden', 'staff'].includes(role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return <>{children}</>;
 };
 
@@ -133,6 +144,9 @@ function App() {
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="leave" element={<LeaveManagementPage />} />
                 <Route path="scan" element={<QRScannerPage />} />
+                <Route path="gate/scan" element={<GateStaffRoute><GateScannerPage /></GateStaffRoute>} />
+                <Route path="gate/currently-out" element={<GateStaffRoute><CurrentlyOutPage /></GateStaffRoute>} />
+                <Route path="gate/movements" element={<GateStaffRoute><MovementLogPage /></GateStaffRoute>} />
                 <Route path="attendance" element={<AttendancePage />} />
                 <Route path="applications" element={<ApplicationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />

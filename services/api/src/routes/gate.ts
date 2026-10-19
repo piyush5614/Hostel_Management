@@ -5,10 +5,16 @@ import rateLimit from 'express-rate-limit';
 import { getDb } from '../db/init.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { TokenPayload } from '../utils/auth.js';
+import { MovementExportRow, writeMovementWorkbook } from '../utils/gate-export.js';
+import {
+  deriveIstDate,
+  isValidGateCategory,
+  isValidGateDateRange,
+  isValidGateToken,
+  normalizeGateReason,
+  parseIstDate,
+} from '../utils/gate-movement.js';
 
-const TOKEN_PATTERN = /^TCHC1\.[A-Za-z0-9_-]{43}$/;
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const CATEGORIES = new Set(['college', 'shop/market', 'meet friends', 'medical', 'other']);
 const SCANNER_ROLES = ['staff', 'warden', 'admin'] as const;
 
 type ScannerRole = typeof SCANNER_ROLES[number];
@@ -40,21 +46,6 @@ function fail(res: Response, status: number, code: string, message: string): voi
 
 function hasScannerRole(role: string): role is ScannerRole {
   return (SCANNER_ROLES as readonly string[]).includes(role);
-}
-
-function parseDate(value: unknown): string | null | undefined {
-  if (value === undefined || value === '') return null;
-  if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return undefined;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value
-    ? undefined
-    : value;
-}
-
-function isAllowedDateRange(from: string | null, to: string | null): boolean {
-  if (!from || !to) return true;
-  const days = (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86400000;
-  return days >= 0 && days <= 365;
 }
 
 function toStudentSnapshot(
@@ -159,14 +150,15 @@ export function createGateRoutes(io: SocketIOServer): Router {
         return;
       }
 
-      let { data: qr, error } = await db
+      const initialQr = await db
         .from('student_qr_tokens')
         .select('token, qr_version')
         .eq('college_id', collegeId)
         .eq('student_id', student.id)
         .eq('is_active', true)
         .maybeSingle();
-      if (error) throw error;
+      if (initialQr.error) throw initialQr.error;
+      let qr = initialQr.data;
 
       if (!qr) {
         const { data: latestQr, error: latestQrError } = await db
@@ -254,7 +246,7 @@ export function createGateRoutes(io: SocketIOServer): Router {
           fail(res, 400, 'INVALID_SCAN_INPUT', 'Provide either a QR token or an enrollment number.');
           return;
         }
-        if (token && !TOKEN_PATTERN.test(token)) {
+        if (token && !isValidGateToken(token)) {
           fail(res, 400, 'INVALID_TOKEN_FORMAT', 'This QR token is not valid.');
           return;
         }
@@ -309,12 +301,20 @@ export function createGateRoutes(io: SocketIOServer): Router {
         }
 
         const movement = result.movement;
-        const response = { movement, student };
+        const { data: scanner, error: scannerError } = await db
+          .from('users')
+          .select('name')
+          .eq('id', req.user!.userId)
+          .eq('college_id', collegeId)
+          .maybeSingle();
+        if (scannerError) throw scannerError;
+        const movementWithScanner = { ...movement, scanned_by_name: scanner?.name || 'Hostel staff' };
+        const response = { movement: movementWithScanner, student };
         if (result.created) {
-          emitUser(io, student.userId, 'gate:reason-requested', { movement });
+          emitUser(io, student.userId, 'gate:reason-requested', { movement: movementWithScanner });
         }
         if (result.returned) {
-          emitUser(io, student.userId, 'gate:movement-updated', { movement });
+          emitUser(io, student.userId, 'gate:movement-updated', { movement: movementWithScanner });
           emitCollege(io, collegeId, 'gate:currently-out-updated', { movementId: movement.id, status: 'RETURNED' });
         }
         res.json({ ...response, created: result.created, returned: result.returned });
@@ -331,13 +331,14 @@ export function createGateRoutes(io: SocketIOServer): Router {
     authorize('student'),
     reasonLimiter,
     async (req: Request, res: Response): Promise<void> => {
-      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
-      const category = typeof req.body?.category === 'string' ? req.body.category : null;
-      if (reason.length < 3 || reason.length > 300) {
+      const reason = normalizeGateReason(req.body?.reason);
+      const categoryValue = typeof req.body?.category === 'string' ? req.body.category.trim() : '';
+      const category = categoryValue || null;
+      if (!reason) {
         fail(res, 400, 'INVALID_REASON', 'Reason must be between 3 and 300 characters.');
         return;
       }
-      if (category && !CATEGORIES.has(category)) {
+      if (!isValidGateCategory(category)) {
         fail(res, 400, 'INVALID_REASON_CATEGORY', 'Choose a valid reason category.');
         return;
       }
@@ -442,10 +443,109 @@ export function createGateRoutes(io: SocketIOServer): Router {
           .limit(1)
           .maybeSingle();
         if (error) throw error;
-        res.json({ movement: data || null });
+        if (!data) {
+          res.json({ movement: null });
+          return;
+        }
+        const { data: scanner, error: scannerError } = await db
+          .from('users')
+          .select('name')
+          .eq('id', data.scanned_by)
+          .eq('college_id', collegeId)
+          .maybeSingle();
+        if (scannerError) throw scannerError;
+        res.json({ movement: { ...data, scanned_by_name: scanner?.name || 'Hostel staff' } });
       } catch (error) {
         console.error('Get student gate movement failed:', error);
         fail(res, 500, 'GATE_MOVEMENT_UNAVAILABLE', 'Could not load your gate movement.');
+      }
+    }
+  );
+
+  router.get(
+    '/movements/export',
+    authenticate,
+    authorize(...SCANNER_ROLES),
+    async (req: Request, res: Response): Promise<void> => {
+      const defaultDate = deriveIstDate(new Date());
+      const from = parseIstDate(req.query.from === undefined ? defaultDate : req.query.from);
+      const to = parseIstDate(req.query.to === undefined ? defaultDate : req.query.to);
+      if (from === undefined || to === undefined || !from || !to || !isValidGateDateRange(from, to)) {
+        fail(res, 400, 'INVALID_DATE_RANGE', 'Provide a valid date range no longer than 366 days.');
+        return;
+      }
+
+      const status = typeof req.query.status === 'string' ? req.query.status.trim() : '';
+      const allowedStatuses = new Set(['PENDING_REASON', 'PENDING_APPROVAL', 'OUT', 'RETURNED', 'EXPIRED', 'REJECTED', 'CANCELLED']);
+      if (status && !allowedStatuses.has(status)) {
+        fail(res, 400, 'INVALID_STATUS', 'Choose a valid movement status.');
+        return;
+      }
+      const block = typeof req.query.block === 'string' ? req.query.block.trim() : '';
+      const studentId = typeof req.query.studentId === 'string' ? req.query.studentId.trim() : '';
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      if (search && (search.length > 80 || !/^[A-Za-z0-9 ._/-]+$/.test(search))) {
+        fail(res, 400, 'INVALID_SEARCH', 'Search contains unsupported characters.');
+        return;
+      }
+
+      try {
+        const db = await getDb();
+        const collegeId = collegeIdFor(req.user!);
+        await expirePending(db, collegeId);
+        const movements: MovementExportRow[] = [];
+        let offset = 0;
+        const batchSize = 1000;
+        while (true) {
+          let query = db
+            .from('gate_movements')
+            .select('*')
+            .eq('college_id', collegeId)
+            .gte('out_date_ist', from)
+            .lte('out_date_ist', to)
+            .order('out_date_ist', { ascending: true })
+            .order('out_time', { ascending: true });
+          if (status) query = query.eq('status', status);
+          if (block) query = query.eq('hostel_block', block);
+          if (studentId) query = query.eq('student_id', studentId);
+          if (search) query = query.or(`student_name.ilike.%${search}%,enrollment_no.ilike.%${search}%`);
+          const { data, error } = await query.range(offset, offset + batchSize - 1);
+          if (error) throw error;
+          const batch = (data || []) as MovementExportRow[];
+          movements.push(...batch);
+          if (batch.length < batchSize) break;
+          offset += batchSize;
+        }
+
+        if (movements.length === 0) {
+          fail(res, 404, 'NO_MOVEMENTS', 'No gate movements were found for the selected range and filters.');
+          return;
+        }
+
+        const actorIds = [...new Set(movements.flatMap((movement) => [movement.approved_by, movement.return_scanned_by]).filter((id): id is string => Boolean(id)))];
+        const userNames = new Map<string, string>();
+        for (let index = 0; index < actorIds.length; index += 500) {
+          const { data: users, error } = await db
+            .from('users')
+            .select('id, name')
+            .eq('college_id', collegeId)
+            .in('id', actorIds.slice(index, index + 500));
+          if (error) throw error;
+          for (const actor of users || []) userNames.set(actor.id, actor.name);
+        }
+
+        const filename = `Hostel_Movement_Report_${from}_to_${to}.xlsx`;
+        res.status(200);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        await writeMovementWorkbook(res, movements, userNames, from, to);
+      } catch (error) {
+        console.error('Export gate movement workbook failed:', error);
+        if (res.headersSent) {
+          res.destroy(error instanceof Error ? error : new Error('Excel export failed'));
+          return;
+        }
+        fail(res, 500, 'GATE_EXPORT_FAILED', 'Could not generate the movement report.');
       }
     }
   );
@@ -486,9 +586,9 @@ export function createGateRoutes(io: SocketIOServer): Router {
         fail(res, 403, 'FORBIDDEN', 'This action is not allowed for your role.');
         return;
       }
-      const from = parseDate(req.query.from);
-      const to = parseDate(req.query.to);
-      if (from === undefined || to === undefined || !isAllowedDateRange(from || null, to || null)) {
+      const from = parseIstDate(req.query.from);
+      const to = parseIstDate(req.query.to);
+      if (from === undefined || to === undefined || !isValidGateDateRange(from || null, to || null)) {
         fail(res, 400, 'INVALID_DATE_RANGE', 'Use valid dates with a range no longer than 366 days.');
         return;
       }

@@ -82,6 +82,24 @@ export const getNavItemsForRole = (role: UserRole): NavItem[] => {
         roles: ['admin'],
       },
       {
+        title: 'Gate Scanner',
+        href: '/gate/scan',
+        icon: <ScanLine className="h-5 w-5" />,
+        roles: ['admin'],
+      },
+      {
+        title: 'Currently Out',
+        href: '/gate/currently-out',
+        icon: <UserCheck className="h-5 w-5" />,
+        roles: ['admin'],
+      },
+      {
+        title: 'Movement Log',
+        href: '/gate/movements',
+        icon: <FileText className="h-5 w-5" />,
+        roles: ['admin'],
+      },
+      {
         title: 'Attendance',
         href: '/attendance',
         icon: <Calendar className="h-5 w-5" />,
@@ -173,6 +191,24 @@ export const getNavItemsForRole = (role: UserRole): NavItem[] => {
         roles: ['warden'],
       },
       {
+        title: 'Gate Scanner',
+        href: '/gate/scan',
+        icon: <ScanLine className="h-5 w-5" />,
+        roles: ['warden'],
+      },
+      {
+        title: 'Currently Out',
+        href: '/gate/currently-out',
+        icon: <UserCheck className="h-5 w-5" />,
+        roles: ['warden'],
+      },
+      {
+        title: 'Movement Log',
+        href: '/gate/movements',
+        icon: <FileText className="h-5 w-5" />,
+        roles: ['warden'],
+      },
+      {
         title: 'Attendance',
         href: '/attendance',
         icon: <Calendar className="h-5 w-5" />,
@@ -249,6 +285,24 @@ export const getNavItemsForRole = (role: UserRole): NavItem[] => {
         title: 'Leave Management',
         href: '/leave',
         icon: <Clock className="h-5 w-5" />,
+        roles: ['staff'],
+      },
+      {
+        title: 'Gate Scanner',
+        href: '/gate/scan',
+        icon: <ScanLine className="h-5 w-5" />,
+        roles: ['staff'],
+      },
+      {
+        title: 'Currently Out',
+        href: '/gate/currently-out',
+        icon: <UserCheck className="h-5 w-5" />,
+        roles: ['staff'],
+      },
+      {
+        title: 'Movement Log',
+        href: '/gate/movements',
+        icon: <FileText className="h-5 w-5" />,
         roles: ['staff'],
       },
       {

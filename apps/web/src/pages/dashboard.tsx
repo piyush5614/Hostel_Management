@@ -6,6 +6,7 @@ import { OccupancyChart } from '../components/dashboard/occupancy-chart';
 import { RecentActivities } from '../components/dashboard/recent-activities';
 import { PhotoApprovalDashboard } from '../components/warden/photo-approval-dashboard';
 import { StudentDataDashboard } from '../components/student/student-data-dashboard';
+import { GateDashboard } from '../components/student/gate-dashboard';
 import { ErrorBoundary } from '../components/error-boundary/error-boundary';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -95,6 +96,8 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {userRole === 'student' && <GateDashboard />}
 
       {/* Admin/Warden Dashboard */}
       {(userRole === 'admin' || userRole === 'warden') && (
