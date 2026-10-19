@@ -32,6 +32,7 @@ import reportRoutes from './routes/reports.js';
 import applicationRoutes from './routes/applications.js';
 import eventRoutes from './routes/events.js';
 import { createNotificationRoutes } from './routes/notifications.js';
+import { createGateRoutes } from './routes/gate.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -89,6 +90,7 @@ app.use('/api/events', eventRoutes);
 // Initialize WebSocket and attach notification routes
 const httpServer = http.createServer(app);
 const io = initializeSocket(httpServer);
+app.use('/api/gate', createGateRoutes(io));
 app.use('/api/notifications', createNotificationRoutes(io));
 
 // Apply Sentry error handler (captures errors from routes)
