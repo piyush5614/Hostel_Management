@@ -3,8 +3,9 @@
  * Verifies JWT and attaches user context to socket connections
  */
 
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { Response, NextFunction } from 'express';
+import { verifyToken } from '../utils/auth.js';
+import type { TokenPayload } from '../utils/auth.js';
 
 // Type definition for authenticated requests
 export interface AuthenticatedRequest {
@@ -32,14 +33,13 @@ export function socketAuthMiddleware(
   }
 
   try {
-    const secret = process.env.SUPABASE_JWT_SECRET || 'your-secret-key';
-    const decoded = jwt.verify(token, secret) as any;
+    const decoded = verifySocketToken(token);
 
     req.user = {
-      id: decoded.sub,
+      id: decoded.userId,
       email: decoded.email,
-      collegeId: decoded.college_id,
-      role: decoded.user_role,
+      collegeId: decoded.collegeId,
+      role: decoded.role,
     };
 
     next();
@@ -59,11 +59,9 @@ export function extractSocketToken(handshake: any): string | null {
 /**
  * Verify JWT and return decoded payload
  */
-export function verifySocketToken(token: string): any {
-  try {
-    const secret = process.env.SUPABASE_JWT_SECRET || 'your-secret-key';
-    return jwt.verify(token, secret);
-  } catch (error) {
-    throw new Error('Invalid token');
-  }
+export function verifySocketToken(token: string | null | undefined): TokenPayload {
+  if (!token) throw new Error('No token provided');
+  const payload = verifyToken(token);
+  if (!payload) throw new Error('Invalid token');
+  return payload;
 }

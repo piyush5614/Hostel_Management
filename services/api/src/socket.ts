@@ -10,7 +10,7 @@
 
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import jwt from 'jsonwebtoken';
+import { verifySocketToken } from './middleware/socket-auth.js';
 
 export interface SocketUser {
   id: string;
@@ -45,18 +45,17 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     }
 
     try {
-      const secret = process.env.SUPABASE_JWT_SECRET || 'your-secret-key';
-      const decoded = jwt.verify(token, secret) as any;
+      const decoded = verifySocketToken(token);
       
       socket.data.user = {
-        id: decoded.sub,
+        id: decoded.userId,
         email: decoded.email,
-        collegeId: decoded.college_id,
-        role: decoded.user_role,
+        collegeId: decoded.collegeId,
+        role: decoded.role,
       };
       
       next();
-    } catch (error) {
+    } catch {
       next(new Error('Authentication error: Invalid token'));
     }
   });
