@@ -1,0 +1,11 @@
+[build]
+  # The web app lives in apps/web; the root "build" script runs Vite from the
+  # repo root, where there is no index.html. build:web runs it inside apps/web.
+  command = "npm run build:web"
+  publish = "apps/web/dist"
+
+# Single-page app fallback so client-side routes (React Router) resolve on refresh.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
