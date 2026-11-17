@@ -98,6 +98,7 @@ async function main() {
     p_email: email!,
     p_role: 'admin',
     p_generated_id: null,
+    p_password_hash: null,
     p_profile: {},
   });
 

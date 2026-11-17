@@ -1,0 +1,129 @@
+{
+  "planHash": "8389a5307f6141726d8fe207917c8835dbbfcc0b8fba6447f8edc32b2cd88fb3",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-11-16T19:16:36.3891512Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "web-typecheck",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E @hostel-connect/web@0.1.0 typecheck\r\n\u003E tsc --noEmit\r\n\r\n",
+        "durationMs": 2073
+      },
+      {
+        "name": "web-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E @hostel-connect/web@0.1.0 build\r\n\u003E vite build\r\n\r\n\u001B[36mvite v5.4.8 \u001B[32mbuilding for production...\u001B[36m\u001B[39m\r\ntransforming...\r\nBrowserslist: caniuse-lite is outdated. Please run:\r\n  npx update-browserslist-db@latest\r\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme\r\n\u001B[32m\u2713\u001B[39m 1706 modules transformed.\r\nGenerated an empty chunk: \u0022supabase\u0022.\r\nrendering chunks...\r\n\u001B[1m\u001B[33m[plugin:vite:reporter]\u001B[39m\u001B[22m \u001B[33m[plugin vite:reporter] \r\n(!) C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/store/mock-data.ts is dynamically imported by C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/store/enhanced-mock-data.ts, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/store/enhanced-mock-data.ts but also statically imported by C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/forms/auto-assign-modal.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/forms/room-allocation-form.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/forms/room-form.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/forms/staff-form.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/forms/student-form.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/leave/enhanced-leave-form.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/components/student/student-data-dashboard.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/attendance-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/credential-management-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/dashboard.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/leave-management-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/maintenance-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/profile-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/qr-scanner-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/reports-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/rooms-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/settings-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/staff-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/students/staff-student-view.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/students/students-page.tsx, C:/Users/asus4/Desktop/Hostel_Comp/apps/web/src/pages/visitor-management-page.tsx, dynamic import will not move module into another chunk.\r\n\u001B[39m\r\ncomputing gzip size...\r\n\u001B[2mdist/\u001B[22m\u001B[32mindex.html                   \u001B[39m\u001B[1m\u001B[2m    0.84 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:   0.43 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[35massets/index-CNaOM-dz.css    \u001B[39m\u001B[1m\u001B[2m  108.04 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:  14.91 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/supabase-l0sNRNKZ.js  \u001B[39m\u001B[1m\u001B[2m    0.00 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:   0.02 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/forms-B2aEDAON.js     \u001B[39m\u001B[1m\u001B[2m    0.03 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:   0.05 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/vendor-OZt95LQM.js    \u001B[39m\u001B[1m\u001B[2m  164.67 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:  53.71 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/ui-DacXL0iA.js        \u001B[39m\u001B[1m\u001B[2m  179.78 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:  60.30 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/index-B7IG749c.js     \u001B[39m\u001B[1m\u001B[33m1,105.42 kB\u001B[39m\u001B[22m\u001B[2m \u2502 gzip: 294.68 kB\u001B[22m\r\n\u001B[33m\r\n(!) Some chunks are larger than 600 kB after minification. Consider:\r\n- Using dynamic import() to code-split the application\r\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\r\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001B[39m\r\n\u001B[32m\u2713 built in 18.38s\u001B[39m\r\n",
+        "durationMs": 21227
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 1,
+        "outputSample": "\r\n\u003E @hostel-connect/web@0.1.0 test\r\n\u003E vitest --run\r\n\r\n\u001B[2m12:45:27 am\u001B[22m \u001B[33m\u001B[1m[vite]\u001B[22m\u001B[39m \u001B[33mwarning: \u0060esbuild\u0060 option was specified by \u0022vite:react-babel\u0022 plugin. This option is deprecated, please use \u0060oxc\u0060 instead.\u001B[39m\r\n\u001B[2m12:45:27 am\u001B[22m \u001B[33m\u001B[1m[vite]\u001B[22m\u001B[39m \u001B[33mwarning: \u0060optimizeDeps.esbuildOptions\u0060 option was specified by \u0022vite:react-babel\u0022 plugin. This option is deprecated, please use \u0060optimizeDeps.rolldownOptions\u0060 instead.\u001B[39m\r\n\u001B[33mBoth esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored.\u001B[39m The following esbuild options were set: \u0060{ jsx: \u0027automatic\u0027, jsxImportSource: undefined }\u0060\r\n\r\n\u001B[1m\u001B[46m RUN \u001B[49m\u001B[22m \u001B[36mv4.1.0 \u001B[39m\u001B[90mC:/Users/asus4/Desktop/Hostel_Comp/apps/web\u001B[39m\r\n\r\n\r\n\u003C--- Last few GCs ---\u003E\r\n\r\n[3048:0000024FEA21B000]     2505 ms: Scavenge 25.1 (35.1) -\u003E 22.0 (54.4) MB, pooled: 0 MB, 8.25 / 0.00 ms  (average mu = 0.996, current mu = 0.996) allocation failure; \r\n[3048:0000024FEA21B000]     5632 ms: Scavenge 41.3 (59.0) -\u003E 34.7 (60.8) MB, pooled: 0 MB, 27.00 / 0.00 ms  (average mu = 0.996, current mu = 0.996) allocation failure; \r\n[3048:0000024FEA21B000]     5886 ms: Scavenge 43.0 (60.8) -\u003E 42.6 (68.3) MB, pooled: 0 MB, 63.58 / 0.00 ms  (average mu = 0.996, current mu = 0.996) allocation failure; \r\n\r\n\r\n\u003C--- JS stacktrace ---\u003E\r\n\r\nFATAL ERROR: AlignedAlloc Allocation failed - process out of memory\r\n----- Native stack trace -----\r\n\r\n 1: 00007FF78C2370F7 \r\n 2: 00007FF78C19AA18 \r\n 3: 00007FF78CD9F151 \r\n 4: 00007FF78CD8BCD6 \r\n 5: 00007FF78C87167F \r\n 6: 00007FF78C9A3E1C \r\n 7: 00007FF78C9A389A \r\n 8: 00007FF78C9A2182 \r\n 9: 00007FF78CC174DB \r\n10: 00007FF78CC17756 \r\n11: 00007FF78C8BF40D \r\n12: 00007FF72CE2D4BA \r\n\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\u001B[1m\u001B[41m Unhandled Errors \u001B[49m\u001B[22m\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\r\n\u001B[31m\u001B[1m\r\nVitest caught 3 unhandled errors during the test run.\r\nThis might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.\u001B[22m\u001B[39m\r\n\r\n\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\u001B[1m\u001B[41m Unhandled Error \u001B[49m\u001B[22m\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\r\n\u001B[31m\u001B[1mError\u001B[22m: [vitest-pool]: Worker forks emitted error.\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m EventEmitter.\u003Canonymous\u003E ../../node_modules/vitest/dist/chunks/cli-api.DuT9iuvY.js:\u001B[2m3452:22\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m EventEmitter.emit node:events:\u001B[2m519:28\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emitUnexpectedExit ../../node_modules/vitest/dist/chunks/cli-api.DuT9iuvY.js:\u001B[2m3019:22\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emit node:events:\u001B[2m519:28\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m Process.ChildProcess._handle.onexit node:internal/child_process:\u001B[2m293:12\u001B[22m\u001B[39m\r\n\r\n\u001B[31m\u001B[1mCaused by: Error\u001B[22m: Worker exited unexpectedly\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emitUnexpectedExit ../../node_modules/vitest/dist/chunks/cli-api.DuT9iuvY.js:\u001B[2m3018:33\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emit node:events:\u001B[2m519:28\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m Process.ChildProcess._handle.onexit node:internal/child_process:\u001B[2m293:12\u001B[22m\u001B[39m\r\n\r\n\r\n\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\u001B[1m\u001B[41m Unhandled Error \u001B[49m\u001B[22m\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\r\n\u001B[31m\u001B[1mError\u001B[22m: [vitest-pool]: Worker forks emitted error.\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m EventEmitter.\u003Canonymous\u003E ../../node_modules/vitest/dist/chunks/cli-api.DuT9iuvY.js:\u001B[2m3452:22\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m EventEmitter.emit node:events:\u001B[2m519:28\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emitUnexpectedExit ../../node_modules/vitest/dist/chunks/cli-api.DuT9iuvY.js:\u001B[2m3019:22\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emit node:events:\u001B[2m519:28\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m Process.ChildProcess._handle.onexit node:internal/child_process:\u001B[2m293:12\u001B[22m\u001B[39m\r\n\r\n\u001B[31m\u001B[1mCaused by: Error\u001B[22m: Worker exited unexpectedly\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emitUnexpectedExit ../../node_modules/vitest/dist/chunks/cli-api.DuT9iuvY.js:\u001B[2m3018:33\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m ChildProcess.emit node:events:\u001B[2m519:28\u001B[22m\u001B[39m\r\n\u001B[90m \u001B[2m\u276F\u001B[22m Process.ChildProcess._handle.onexit node:internal/child_process:\u001B[2m293:12\u001B[22m\u001B[39m\r\n\r\n\r\n\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\u001B[1m\u001B[41m Unhandled Error \u001B[49m\u001B[22m\u001B[31m\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF\u001B[39m\r\n\u001B[31m\u001B[1mError\u001B[22m: [vitest-pool]: Wo\n\u2026[truncated]",
+        "durationMs": 66552,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 14,
+          "testsPassed": 14,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "dev-server-serves-home",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!doctype html\u003E\n\u003Chtml lang=\u0022en\u0022\u003E\n  \u003Chead\u003E\n    \u003Cscript type=\u0022module\u0022\u003E\nimport RefreshRuntime from \u0022/@react-refresh\u0022\nRefreshRuntime.injectIntoGlobalHook(window)\nwindow.$RefreshReg$ = () =\u003E {}\nwindow.$RefreshSig$ = () =\u003E (type) =\u003E type\nwindow.__vite_plugin_react_preamble_installed__ = true\n\u003C/script\u003E\n\n    \u003Cscript type=\u0022module\u0022 src=\u0022/@vite/client\u0022\u003E\u003C/script\u003E\n\n    \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\n    \u003Clink rel=\u0022icon\u0022 type=\u0022image/svg\u002Bxml\u0022 href=\u0022/vite.svg\u0022 /\u003E\n    \u003Clink rel=\u0022manifest\u0022 href=\u0022/manifest.json\u0022 /\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022 /\u003E\n    \u003Cmeta name=\u0022theme-color\u0022 content=\u0022#0066cc\u0022 /\u003E\n    \u003Cmeta name=\u0022description\u0022 content=\u0022Comprehensive hostel management system for student housing\u0022 /\u003E\n    \u003Ctitle\u003EHostel Connect - Hostel Management System\u003C/title\u003E\n  \u003C/head\u003E\n  \u003Cbody\u003E\n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\n    \u003Cscript type=\u0022module\u0022 src=\u0022/src/main.tsx\u0022\u003E\u003C/script\u003E\n  \u003C/body\u003E\n\u003C/html\u003E\n--- server output ---\n\r\n\u003E @hostel-connect/web@0.1.0 dev\r\n\u003E vite --host 127.0.0.1 --port 4173 --strictPort\r\n\r\n\r\n  \u001B[32m\u001B[1mVITE\u001B[22m v5.4.8\u001B[39m  \u001B[2mready in \u001B[0m\u001B[1m957\u001B[22m\u001B[2m\u001B[0m ms\u001B[22m\r\n\r\n  \u001B[32m\u279C\u001B[39m  \u001B[1mLocal\u001B[22m:   \u001B[36mhttp://127.0.0.1:\u001B[1m4173\u001B[22m/\u001B[39m\r\n",
+        "durationMs": 5379
+      }
+    ],
+    "executions": [
+      {
+        "source": "web-typecheck",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "typecheck"
+        ],
+        "cwd": "C:\\Users\\asus4\\Desktop\\Hostel_Comp\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "web-build",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "C:\\Users\\asus4\\Desktop\\Hostel_Comp\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "test",
+          "--",
+          "--run"
+        ],
+        "cwd": "C:\\Users\\asus4\\Desktop\\Hostel_Comp\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "dev-server-serves-home",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "dev",
+          "--",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "4173",
+          "--strictPort"
+        ],
+        "cwd": "C:\\Users\\asus4\\Desktop\\Hostel_Comp\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

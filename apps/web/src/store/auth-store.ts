@@ -37,6 +37,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isInitializing: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -54,6 +55,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false, // Start with false for better UX
+      isInitializing: true,
       error: null,
 
       clearError: () => set({ error: null }),
@@ -91,7 +93,7 @@ export const useAuthStore = create<AuthState>()(
             console.error('❌ Authentication failed:', authError);
             
             // User-friendly error messages
-            let errorMessage = 'Login failed. Please try again.';
+            let errorMessage = authError.message || 'Login failed. Please try again.';
             
             if (authError.message.includes('Invalid login credentials')) {
               errorMessage = 'Invalid email or password. Please check your credentials and try again.';
@@ -214,7 +216,7 @@ export const useAuthStore = create<AuthState>()(
         initializationInFlight = true;
         try {
           console.log('🔎 Auth diagnostic: initialize started');
-          set({ isLoading: true, error: null });
+          set({ isInitializing: true, error: null });
           console.log('🔄 Initializing authentication...');
           
           const { data: { session }, error } = await supabase.auth.getSession();
@@ -293,6 +295,7 @@ export const useAuthStore = create<AuthState>()(
             error: null 
           });
         } finally {
+          set({ isInitializing: false });
           initializationInFlight = false;
         }
       },

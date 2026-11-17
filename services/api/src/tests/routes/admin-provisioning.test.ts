@@ -29,6 +29,11 @@ describe('Admin account provisioning routes', () => {
     expect(response.status).toBe(401);
   });
 
+  it('rejects unauthenticated warden provisioning', async () => {
+    const response = await request(app).post('/api/admin/wardens').send({});
+    expect(response.status).toBe(401);
+  });
+
   it('returns 403 when a non-admin tries to provision staff', async () => {
     const response = await request(app)
       .post('/api/admin/staff')
@@ -57,5 +62,16 @@ describe('Admin account provisioning routes', () => {
     expect(response.status).toBe(400);
     expect(response.body.fields).toContain('course');
     expect(response.body.fields).toContain('guardian_name');
+  });
+
+  it('requires a valid warden profile before provisioning', async () => {
+    const response = await request(app)
+      .post('/api/admin/wardens')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`)
+      .send({ email: 'warden@example.com', password: 'SecurePass123!', name: 'Test Warden', generatedId: 'WRD-1000', profile: {} });
+
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toContain('position');
+    expect(response.body.fields).toContain('department');
   });
 });

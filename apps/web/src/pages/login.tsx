@@ -9,6 +9,13 @@ import { useAuthStore } from '../store/auth-store';
 import { toast } from 'sonner';
 import { ErrorBoundary, LoadingState } from '../components/error-boundary/error-boundary';
 
+const demoAccounts = [
+  { label: 'Admin', email: 'demo.admin@tchostel.edu', password: 'DemoAdmin@2026!', collegeId: 'college-demo', icon: Shield },
+  { label: 'Warden', email: 'demo.warden@tchostel.edu', password: 'DemoWarden@2026!', collegeId: 'college-default', icon: Building2 },
+  { label: 'Staff', email: 'demo.staff@tchostel.edu', password: 'DemoStaff@2026!', collegeId: 'college-default', icon: Users },
+  { label: 'Student', email: 'demo.student@tchostel.edu', password: 'DemoStudent@2026!', collegeId: 'college-default', icon: School },
+];
+
 export function LoginPage() {
   const navigate = useNavigate();
   const { 
@@ -86,31 +93,30 @@ export function LoginPage() {
     return isValid;
   };
 
-  // Handle login form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Clear previous errors
+  const handleLogin = async (identifier: string, secret: string) => {
     clearError();
-    
-    // Validate form
-    if (!validateForm()) {
-      return;
-    }
-
     try {
-      // Pass the identifier as-is — could be email or generated ID
-      const identifier = email.trim();
-      await login(
-        isGeneratedId(identifier) ? identifier.toUpperCase() : identifier.toLowerCase(),
-        password
-      );
+      await login(identifier, secret);
       toast.success('Login successful! Welcome back.');
-      // Navigation is handled by the useEffect hook above
     } catch (error: any) {
       console.error('Login failed:', error);
       toast.error(error.message || 'Login failed. Please try again.');
     }
+  };
+
+  // Handle login form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    const identifier = email.trim();
+    await handleLogin(
+      isGeneratedId(identifier) ? identifier.toUpperCase() : identifier.toLowerCase(),
+      password
+    );
   };
 
   // Handle password reset
@@ -293,6 +299,38 @@ export function LoginPage() {
                 </span>
               )}
             </Button>
+
+            {import.meta.env.DEV && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="h-px flex-1 bg-border" />
+                  <span>Quick demo sign-in</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {demoAccounts.map(({ label, email: demoEmail, password: demoPassword, collegeId: demoCollegeId, icon: Icon }) => (
+                    <Button
+                      key={label}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={isLoading}
+                      onClick={() => {
+                        localStorage.setItem('tc-hostel-active-college-id', demoCollegeId);
+                        setEmail(demoEmail);
+                        setPassword(demoPassword);
+                        setShowPassword(false);
+                        void handleLogin(demoEmail, demoPassword);
+                      }}
+                    >
+                      <Icon className="mr-2 h-4 w-4" />
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </form>
 
           {/* Enhanced help section */}

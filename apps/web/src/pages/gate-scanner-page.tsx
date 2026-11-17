@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { useAuthStore } from '../store/auth-store';
 import { initializeSocket } from '../lib/socket-client';
 import { GateMovement, GateStudent, gateService } from '../services/gate';
+import { getCameraAspectRatio } from '../lib/camera';
 
 const SCANNER_ID = 'gate-movement-qr-scanner';
 
@@ -75,22 +76,29 @@ export function GateScannerPage() {
   useEffect(() => {
     let mounted = true;
     const startCamera = async () => {
+      let scanner: Html5Qrcode | null = null;
       try {
         const element = document.getElementById(SCANNER_ID);
         if (!element || !mounted) return;
-        const scanner = new Html5Qrcode(SCANNER_ID);
+        scanner = new Html5Qrcode(SCANNER_ID);
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
+          { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: getCameraAspectRatio(window.innerWidth, window.innerHeight) },
           (decodedText) => { void processEntry(decodedText); },
           () => undefined
         );
+        if (!mounted) {
+          if (scanner.getState() === 2) await scanner.stop();
+          if (scannerRef.current === scanner) scannerRef.current = null;
+          return;
+        }
         if (mounted) {
           setCameraReady(true);
           setCameraError(null);
         }
       } catch (cameraStartError) {
+        if (scannerRef.current === scanner) scannerRef.current = null;
         if (!mounted) return;
         const message = cameraStartError instanceof Error ? cameraStartError.message : String(cameraStartError);
         setCameraError(/notallowed|permission|denied/i.test(message)
@@ -182,7 +190,7 @@ export function GateScannerPage() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Camera className="h-5 w-5" />Scan student QR</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div id={SCANNER_ID} className="min-h-64 overflow-hidden rounded-xl bg-black" />
+            <div id={SCANNER_ID} className="aspect-[4/3] min-h-[280px] overflow-hidden rounded-xl bg-black md:aspect-video md:min-h-0" />
             {cameraReady && <p className="text-center text-xs text-muted-foreground">Camera active</p>}
             {cameraError && <p role="status" className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900"><AlertTriangle className="h-4 w-4 shrink-0" />{cameraError}</p>}
             <form onSubmit={submitManual} className="flex flex-col gap-2 sm:flex-row">

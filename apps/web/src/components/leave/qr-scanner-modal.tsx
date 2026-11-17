@@ -7,6 +7,7 @@ import {
   Camera, Phone, CheckCircle, AlertTriangle, User, FileText, ImagePlus,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getCameraAspectRatio } from '../../lib/camera';
 
 interface QRScanResult {
   type: string;
@@ -55,17 +56,20 @@ export function QRScannerModal({ isOpen, onClose, onCallConfirmed }: QRScannerMo
     }
   }, []);
 
-  const startScanner = useCallback(async () => {
+  const startScanner = useCallback(async (isActive: () => boolean) => {
     // Wait for DOM element to be available
     await new Promise((resolve) => setTimeout(resolve, 300));
+    if (!isActive()) return;
 
     const element = document.getElementById(scannerContainerId);
     if (!element) return;
 
+    let html5Qrcode: Html5Qrcode | null = null;
     try {
       await stopScanner();
+      if (!isActive()) return;
 
-      const html5Qrcode = new Html5Qrcode(scannerContainerId);
+      html5Qrcode = new Html5Qrcode(scannerContainerId);
       scannerRef.current = html5Qrcode;
 
       await html5Qrcode.start(
@@ -73,7 +77,7 @@ export function QRScannerModal({ isOpen, onClose, onCallConfirmed }: QRScannerMo
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
+          aspectRatio: getCameraAspectRatio(window.innerWidth, window.innerHeight),
         },
         (decodedText) => {
           try {
@@ -95,7 +99,13 @@ export function QRScannerModal({ isOpen, onClose, onCallConfirmed }: QRScannerMo
           // QR code scan error (no code found in frame) — ignore
         }
       );
+      if (!isActive()) {
+        if (html5Qrcode.getState() === 2) await html5Qrcode.stop();
+        if (scannerRef.current === html5Qrcode) scannerRef.current = null;
+      }
     } catch (err: any) {
+      if (scannerRef.current === html5Qrcode) scannerRef.current = null;
+      if (!isActive()) return;
       if (err?.toString?.().includes('NotAllowedError')) {
         setError('Camera permission denied. Please allow camera access and try again.');
       } else {
@@ -105,12 +115,14 @@ export function QRScannerModal({ isOpen, onClose, onCallConfirmed }: QRScannerMo
   }, [stopScanner]);
 
   useEffect(() => {
+    let active = true;
     if (isOpen && step === 'scanning') {
-      startScanner();
+      void startScanner(() => active);
     }
 
     return () => {
-      stopScanner();
+      active = false;
+      void stopScanner();
     };
   }, [isOpen, step, startScanner, stopScanner]);
 
@@ -218,7 +230,7 @@ export function QRScannerModal({ isOpen, onClose, onCallConfirmed }: QRScannerMo
         {/* Step: Scanning */}
         {step === 'scanning' && (
           <div className="space-y-3">
-            <div className="rounded-xl overflow-hidden bg-black relative" style={{ minHeight: 280 }}>
+            <div className="relative aspect-[4/3] min-h-[280px] overflow-hidden rounded-xl bg-black md:aspect-video md:min-h-0">
               <div id={scannerContainerId} className="w-full" />
             </div>
             <p className="text-center text-sm text-muted-foreground">

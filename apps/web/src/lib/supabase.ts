@@ -70,9 +70,19 @@ interface BackendLoginResult {
   token: string;
 }
 
+export class BackendLoginError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'BackendLoginError';
+  }
+}
+
 const AUTH_SESSION_KEY = 'tc-hostel-enhanced-session';
 
-async function backendLogin(identifier: string, password: string): Promise<BackendLoginResult | null> {
+async function backendLogin(identifier: string, password: string): Promise<BackendLoginResult> {
   try {
     const collegeId = getActiveCollegeId();
     const res = await fetchWithTimeout('/api/auth/login', {
@@ -84,8 +94,12 @@ async function backendLogin(identifier: string, password: string): Promise<Backe
       body: JSON.stringify({ email: identifier, password, collegeId }),
     });
     if (!res.ok) {
-      console.error('🔎 Auth diagnostic: backend login rejected', { status: res.status });
-      return null;
+      const payload = await res.json().catch(() => ({})) as { error?: string };
+      const message = res.status >= 500
+        ? 'The login server is unavailable. Please try again in a moment.'
+        : payload.error || 'Invalid email or ID or password.';
+      console.error('🔎 Auth diagnostic: backend login rejected', { status: res.status, message });
+      throw new BackendLoginError(message, res.status);
     }
     const result = (await res.json()) as BackendLoginResult;
     console.log('🔎 Auth diagnostic: backend login resolved', {
@@ -93,9 +107,15 @@ async function backendLogin(identifier: string, password: string): Promise<Backe
       hasToken: Boolean(result.token),
     });
     return result;
-  } catch {
-    console.error('🔎 Auth diagnostic: backend login request failed');
-    return null;
+  } catch (error) {
+    if (error instanceof BackendLoginError) {
+      throw error;
+    }
+
+    console.error('🔎 Auth diagnostic: backend login request failed', error);
+    throw new BackendLoginError(
+      'The login server cannot be reached. Check that the API and database are running, then try again.',
+    );
   }
 }
 
@@ -111,20 +131,12 @@ export const supabase = {
 
       // ───── 1.  Try the real backend first ─────
       const backendResult = await backendLogin(identifier, password);
-      if (!backendResult) {
-        return {
-          data: { user: null, session: null },
-          error: { message: 'Invalid email or ID or password. Use the credentials issued by your administrator.' },
-        };
-      }
+      console.log('✅ Backend login successful for:', backendResult.user.email);
 
-      if (backendResult) {
-        console.log('✅ Backend login successful for:', backendResult.user.email);
-
-        const bu = backendResult.user;
-        const collegeId = bu.college_id || getActiveCollegeId();
-        setActiveCollegeId(collegeId);
-        const mockUser: SupabaseUser = {
+      const bu = backendResult.user;
+      const collegeId = bu.college_id || getActiveCollegeId();
+      setActiveCollegeId(collegeId);
+      const mockUser: SupabaseUser = {
           id: bu.id,
           email: bu.email!,
           user_metadata: { role: bu.role, college_id: collegeId },
@@ -148,10 +160,10 @@ export const supabase = {
           new_phone: null,
           identities: [],
           factors: [],
-        };
+      };
 
         // Cache the backend profile so reloads do not depend on another request.
-        const backendProfile = {
+      const backendProfile = {
           id: bu.id,
           auth_id: bu.id,
           name: bu.name,
@@ -161,9 +173,9 @@ export const supabase = {
           profile_image: bu.profile_image || '',
           is_active: true,
           last_login: new Date().toISOString(),
-        };
+      };
 
-        const mockSession = {
+      const mockSession = {
           access_token: backendResult.token,
           refresh_token: 'backend-refresh',
           expires_in: 604800,
@@ -172,18 +184,12 @@ export const supabase = {
           college_id: collegeId,
           profile: backendProfile,
           user: mockUser,
-        };
-
-        currentSession = mockSession;
-        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(mockSession));
-
-        return { data: { user: mockUser, session: mockSession }, error: null };
-      }
-
-      return {
-        data: { user: null, session: null },
-        error: { message: 'Invalid email or ID or password. Use the credentials issued by your administrator.' },
       };
+
+      currentSession = mockSession;
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(mockSession));
+
+      return { data: { user: mockUser, session: mockSession }, error: null };
     },
 
     getSession: async () => {

@@ -1,28 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { LoginPage } from './pages/login';
-import { DashboardPage } from './pages/dashboard';
-import { RoomsPage } from './pages/rooms-page';
-import { StudentsPage } from './pages/students/students-page';
-import { ProfilePage } from './pages/profile-page';
-import { ApplicationsPage } from './pages/applications-page';
-import { ReportsPage } from './pages/reports-page';
-import { EventsPage } from './pages/events-page';
-import { MessagesPage } from './pages/messages-page';
-import { SettingsPage } from './pages/settings-page';
-import { LeaveManagementPage } from './pages/leave-management-page';
-import { AttendancePage } from './pages/attendance-page';
-import { MaintenancePage } from './pages/maintenance-page';
-import { VisitorManagementPage } from './pages/visitor-management-page';
-import { StaffPage } from './pages/staff-page';
-import { StaffTasksPage } from './pages/staff-tasks-page';
-import { CredentialManagementPage } from './pages/credential-management-page';
-import { QRScannerPage } from './pages/qr-scanner-page';
-import { StaffStudentView } from './pages/students/staff-student-view';
-import { ActivityFeedPage } from './pages/activity-feed';
-import { MainLayout } from './components/layout/main-layout';
-import { ParentApprovalPage } from './components/parent-approval/parent-approval-page';
-import { TaskStartPage } from './pages/task-start-page';
 import { ErrorBoundary } from './components/error-boundary/error-boundary';
 import { NotificationProvider } from './lib/notification-context';
 import { NotificationHandler } from './components/notifications/notification-handler';
@@ -30,9 +7,33 @@ import { useAuthStore } from './store/auth-store';
 import { LanguageProvider } from './lib/language-context';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { GateScannerPage } from './pages/gate-scanner-page';
-import { CurrentlyOutPage } from './pages/currently-out-page';
-import { MovementLogPage } from './pages/movement-log-page';
+
+const LoginPage = React.lazy(() => import('./pages/login').then(({ LoginPage }) => ({ default: LoginPage })));
+const DashboardPage = React.lazy(() => import('./pages/dashboard').then(({ DashboardPage }) => ({ default: DashboardPage })));
+const RoomsPage = React.lazy(() => import('./pages/rooms-page').then(({ RoomsPage }) => ({ default: RoomsPage })));
+const StudentsPage = React.lazy(() => import('./pages/students/students-page').then(({ StudentsPage }) => ({ default: StudentsPage })));
+const ProfilePage = React.lazy(() => import('./pages/profile-page').then(({ ProfilePage }) => ({ default: ProfilePage })));
+const ApplicationsPage = React.lazy(() => import('./pages/applications-page').then(({ ApplicationsPage }) => ({ default: ApplicationsPage })));
+const ReportsPage = React.lazy(() => import('./pages/reports-page').then(({ ReportsPage }) => ({ default: ReportsPage })));
+const EventsPage = React.lazy(() => import('./pages/events-page').then(({ EventsPage }) => ({ default: EventsPage })));
+const MessagesPage = React.lazy(() => import('./pages/messages-page').then(({ MessagesPage }) => ({ default: MessagesPage })));
+const SettingsPage = React.lazy(() => import('./pages/settings-page').then(({ SettingsPage }) => ({ default: SettingsPage })));
+const LeaveManagementPage = React.lazy(() => import('./pages/leave-management-page').then(({ LeaveManagementPage }) => ({ default: LeaveManagementPage })));
+const AttendancePage = React.lazy(() => import('./pages/attendance-page').then(({ AttendancePage }) => ({ default: AttendancePage })));
+const MaintenancePage = React.lazy(() => import('./pages/maintenance-page').then(({ MaintenancePage }) => ({ default: MaintenancePage })));
+const VisitorManagementPage = React.lazy(() => import('./pages/visitor-management-page').then(({ VisitorManagementPage }) => ({ default: VisitorManagementPage })));
+const StaffPage = React.lazy(() => import('./pages/staff-page').then(({ StaffPage }) => ({ default: StaffPage })));
+const StaffTasksPage = React.lazy(() => import('./pages/staff-tasks-page').then(({ StaffTasksPage }) => ({ default: StaffTasksPage })));
+const CredentialManagementPage = React.lazy(() => import('./pages/credential-management-page').then(({ CredentialManagementPage }) => ({ default: CredentialManagementPage })));
+const QRScannerPage = React.lazy(() => import('./pages/qr-scanner-page').then(({ QRScannerPage }) => ({ default: QRScannerPage })));
+const StaffStudentView = React.lazy(() => import('./pages/students/staff-student-view').then(({ StaffStudentView }) => ({ default: StaffStudentView })));
+const ActivityFeedPage = React.lazy(() => import('./pages/activity-feed').then(({ ActivityFeedPage }) => ({ default: ActivityFeedPage })));
+const MainLayout = React.lazy(() => import('./components/layout/main-layout').then(({ MainLayout }) => ({ default: MainLayout })));
+const ParentApprovalPage = React.lazy(() => import('./components/parent-approval/parent-approval-page').then(({ ParentApprovalPage }) => ({ default: ParentApprovalPage })));
+const TaskStartPage = React.lazy(() => import('./pages/task-start-page').then(({ TaskStartPage }) => ({ default: TaskStartPage })));
+const GateScannerPage = React.lazy(() => import('./pages/gate-scanner-page').then(({ GateScannerPage }) => ({ default: GateScannerPage })));
+const CurrentlyOutPage = React.lazy(() => import('./pages/currently-out-page').then(({ CurrentlyOutPage }) => ({ default: CurrentlyOutPage })));
+const MovementLogPage = React.lazy(() => import('./pages/movement-log-page').then(({ MovementLogPage }) => ({ default: MovementLogPage })));
 
 // Create query client instance (outside component to prevent recreation)
 const queryClient = new QueryClient();
@@ -90,7 +91,7 @@ const GateStaffRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
-  const { user, isAuthenticated, logout, initialize, isLoading } = useAuthStore();
+  const { user, isAuthenticated, logout, initialize, isInitializing } = useAuthStore();
   
   useEffect(() => {
     // Initialize authentication on app start
@@ -98,7 +99,7 @@ function App() {
   }, []);
   
   // Show loading screen during initial authentication check
-  if (isLoading) {
+  if (isInitializing) {
     return (
       <ErrorBoundary>
         <div className="flex min-h-screen items-center justify-center">
@@ -118,6 +119,7 @@ function App() {
           <ErrorBoundary>
             <BrowserRouter>
             <NotificationHandler />
+            <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading page...</div>}>
             <Routes>
               {/* Public route - Login page */}
               <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
@@ -166,6 +168,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Routes>
+            </React.Suspense>
           </BrowserRouter>
         </ErrorBoundary>
       </NotificationProvider>

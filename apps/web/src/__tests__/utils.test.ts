@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { cn, formatDate, formatDateTime, truncateText, generateRandomId } from '../lib/utils'
+import { getCameraAspectRatio } from '../lib/camera'
 
 describe('Utility Functions', () => {
+  describe('getCameraAspectRatio', () => {
+    it('uses a landscape camera frame for landscape screens', () => {
+      expect(getCameraAspectRatio(1365, 768)).toBeCloseTo(16 / 9)
+    })
+
+    it('keeps a square camera frame for portrait screens', () => {
+      expect(getCameraAspectRatio(390, 844)).toBe(1)
+    })
+  })
+
   describe('cn - class name merging', () => {
     it('should merge class names correctly', () => {
       const result = cn('px-2', 'py-1', 'bg-slate-50')

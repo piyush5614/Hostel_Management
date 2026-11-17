@@ -14,6 +14,7 @@ import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useDataRefresh } from '../utils/use-data-refresh';
 import { EVENTS } from '../utils/event-bus';
+import { getCameraAspectRatio } from '../lib/camera';
 
 interface ScanRecord {
   id: string;
@@ -67,14 +68,17 @@ export function QRScannerPage() {
     }
   }, []);
 
-  const startScanner = useCallback(async () => {
+  const startScanner = useCallback(async (isActive: () => boolean) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
+    if (!isActive()) return;
     const element = document.getElementById(scannerContainerId);
     if (!element) return;
 
+    let html5Qrcode: Html5Qrcode | null = null;
     try {
       await stopScanner();
-      const html5Qrcode = new Html5Qrcode(scannerContainerId);
+      if (!isActive()) return;
+      html5Qrcode = new Html5Qrcode(scannerContainerId);
       scannerRef.current = html5Qrcode;
 
       await html5Qrcode.start(
@@ -82,7 +86,7 @@ export function QRScannerPage() {
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
+          aspectRatio: getCameraAspectRatio(window.innerWidth, window.innerHeight),
         },
         (decodedText) => {
           try {
@@ -101,7 +105,13 @@ export function QRScannerPage() {
         },
         () => {}
       );
+      if (!isActive()) {
+        if (html5Qrcode.getState() === 2) await html5Qrcode.stop();
+        if (scannerRef.current === html5Qrcode) scannerRef.current = null;
+      }
     } catch (err: any) {
+      if (scannerRef.current === html5Qrcode) scannerRef.current = null;
+      if (!isActive()) return;
       if (err?.toString?.().includes('NotAllowedError')) {
         setError('Camera permission denied. Please allow camera access and try again.');
       } else {
@@ -111,11 +121,13 @@ export function QRScannerPage() {
   }, [stopScanner]);
 
   useEffect(() => {
+    let active = true;
     if (step === 'scanning') {
-      startScanner();
+      void startScanner(() => active);
     }
     return () => {
-      stopScanner();
+      active = false;
+      void stopScanner();
     };
   }, [step, startScanner, stopScanner]);
 
@@ -268,7 +280,7 @@ export function QRScannerPage() {
                 {/* Scanning */}
                 {step === 'scanning' && (
                   <div className="space-y-3">
-                    <div className="rounded-xl overflow-hidden bg-black relative mx-auto max-w-lg" style={{ minHeight: 320 }}>
+                    <div className="aspect-[4/3] min-h-[280px] overflow-hidden rounded-xl bg-black relative mx-auto max-w-lg md:aspect-video md:min-h-0">
                       <div id={scannerContainerId} className="w-full" />
                     </div>
                     <p className="text-center text-sm text-muted-foreground">

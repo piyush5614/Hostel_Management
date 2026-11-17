@@ -8,7 +8,7 @@ import { log } from '../utils/logger.js';
 const router = Router();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type AccountRole = 'student' | 'staff';
+type AccountRole = 'student' | 'staff' | 'warden';
 type ProvisionInput = {
   email?: unknown;
   password?: unknown;
@@ -89,16 +89,25 @@ async function provisionAccount(req: Request, res: Response, role: AccountRole):
   let provisioned: any;
   let provisionError: any;
   try {
-    const result = await db.rpc('provision_managed_user', {
-      p_auth_id: null,
-      p_college_id: collegeId,
-      p_name: name,
-      p_email: accountEmail,
-      p_role: role,
-      p_generated_id: generatedId,
-      p_password_hash: passwordHash,
-      p_profile: profile,
-    });
+    const result = role === 'warden'
+      ? await db.rpc('provision_warden_managed_user', {
+        p_college_id: collegeId,
+        p_name: name,
+        p_email: accountEmail,
+        p_generated_id: generatedId,
+        p_password_hash: passwordHash,
+        p_profile: profile,
+      })
+      : await db.rpc('provision_managed_user', {
+        p_auth_id: null,
+        p_college_id: collegeId,
+        p_name: name,
+        p_email: accountEmail,
+        p_role: role,
+        p_generated_id: generatedId,
+        p_password_hash: passwordHash,
+        p_profile: profile,
+      });
     provisioned = result.data;
     provisionError = result.error;
   } catch (error) {
@@ -146,6 +155,15 @@ router.post('/staff', authenticate, authorize('admin'), async (req: Request, res
   } catch (error) {
     log.error('Admin staff provisioning failed', error);
     if (!res.headersSent) res.status(500).json({ error: 'Unable to provision staff account.' });
+  }
+});
+
+router.post('/wardens', authenticate, authorize('admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    await provisionAccount(req, res, 'warden');
+  } catch (error) {
+    log.error('Admin warden provisioning failed', error);
+    if (!res.headersSent) res.status(500).json({ error: 'Unable to provision warden account.' });
   }
 });
 

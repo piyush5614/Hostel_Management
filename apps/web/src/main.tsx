@@ -6,6 +6,7 @@ import { DisplayModeProvider } from './lib/display-mode';
 import './lib/i18n'; // Initialize i18next
 import { I18nextProvider } from 'react-i18next';
 import i18n from './lib/i18n';
+import { ErrorBoundary } from './components/error-boundary/error-boundary';
 
 import { measurePageLoad } from './utils/performance-monitor';
 
@@ -29,11 +30,13 @@ try {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <I18nextProvider i18n={i18n}>
-      <DisplayModeProvider>
-        <App />
-      </DisplayModeProvider>
-    </I18nextProvider>
+    <ErrorBoundary>
+      <I18nextProvider i18n={i18n}>
+        <DisplayModeProvider>
+          <App />
+        </DisplayModeProvider>
+      </I18nextProvider>
+    </ErrorBoundary>
   </StrictMode>
 );
 

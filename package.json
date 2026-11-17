@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently --kill-others-on-fail \"npm run dev:api\" \"npm run dev:web\"",
     "dev:web": "npm --prefix apps/web run dev",
     "dev:api": "npm --prefix services/api run dev",
     "dev:control-center": "npm --prefix apps/control-center run dev",
@@ -68,6 +68,7 @@
   "devDependencies": {
     "@eslint/js": "^9.9.1",
     "@playwright/test": "^1.58.2",
+    "concurrently": "^8.2.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
